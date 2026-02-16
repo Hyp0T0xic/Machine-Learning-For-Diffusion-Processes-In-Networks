@@ -1,4 +1,4 @@
-"""Network generation and visualization package for diffusion cascade source detection."""
+"""Network generation package for diffusion cascade source detection."""
 
 from .generator import (
     generate_er_network,
@@ -8,7 +8,6 @@ from .generator import (
     compute_network_stats,
     save_networks,
 )
-from .visualizer import visualize_networks
 
 __all__ = [
     "generate_er_network",
@@ -17,5 +16,4 @@ __all__ = [
     "generate_all_networks",
     "compute_network_stats",
     "save_networks",
-    "visualize_networks",
 ]

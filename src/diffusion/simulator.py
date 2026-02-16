@@ -14,7 +14,7 @@ from pathlib import Path
 import networkx as nx
 import numpy as np
 
-from .models import CascadeResult, create_model, r0_to_params
+from src.models import CascadeResult, create_model, r0_to_params
 
 
 def select_sources(

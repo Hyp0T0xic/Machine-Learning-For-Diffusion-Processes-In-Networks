@@ -1,14 +1,16 @@
 #!/usr/bin/env python
 """
-run_diffusion.py
-================
-Main entry point: run diffusion cascades on all three contact networks
+simulate.py
+===========
+Generate SIR cascades on contact networks and save results.
+
+Main entry point for running diffusion cascades on all three contact networks
 across a range of R₀ values, print statistics, save results, and
 generate cascade-tree visualisations.
 
 Usage
 -----
-    python run_diffusion.py
+    python src/simulate.py
 """
 
 from __future__ import annotations
@@ -16,22 +18,22 @@ from __future__ import annotations
 import networkx as nx
 import numpy as np
 
-from networks.generator import compute_network_stats
-from diffusion.models import r0_to_params, CascadeResult
-from diffusion.simulator import (
+from src.networks.generator import compute_network_stats
+from src.models import r0_to_params, CascadeResult
+from src.diffusion.simulator import (
     select_sources,
     run_experiment,
     compute_cascade_stats,
     save_cascades,
 )
-from diffusion.cascade_viz import plot_cascade_tree, plot_comparison_grid
+from src.viz import plot_cascade_tree, plot_comparison_grid
 
 
 # ── Configuration ───────────────────────────────────────────────────────────
 
 NETWORK_DIR = "data/networks"
-CASCADE_DIR = "data/cascades"
-VIZ_DIR = "data/cascades/visualizations"
+CASCADE_DIR = "data/raw"
+VIZ_DIR = "results/figures"
 
 NETWORK_FILES = {
     "ER": f"{NETWORK_DIR}/er_network.graphml",

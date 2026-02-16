@@ -10,12 +10,12 @@ Usage
     python generate_networks.py
 """
 
-from networks.generator import (
+from src.networks.generator import (
     generate_all_networks,
     compute_network_stats,
     save_networks,
 )
-from networks.visualizer import visualize_networks
+from src.viz import visualize_networks
 
 
 def main() -> None:

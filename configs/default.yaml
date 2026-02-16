@@ -1,0 +1,27 @@
+# Default configuration for patient_zero project
+# Base graph parameters, R₀ grid, n_cascades, etc.
+
+# Network generation parameters
+network:
+  n_nodes: 100
+  er_probability: 0.05
+  ba_attachment: 3
+  seed: 42
+
+# Diffusion simulation parameters
+diffusion:
+  r0_values: [0.5, 1.0, 1.5, 2.0, 3.0]
+  model_names: ["IC", "SI", "SIR"]
+  n_sources: 5
+  n_runs: 1
+  sir_gamma: 0.2
+  seed: 42
+
+# Data paths
+paths:
+  network_dir: "data/networks"
+  cascade_dir: "data/raw"
+  viz_dir: "results/figures"
+  processed_dir: "data/processed"
+  splits_dir: "data/splits"
+  results_dir: "results"
