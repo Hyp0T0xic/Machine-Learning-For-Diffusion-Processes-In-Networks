@@ -209,3 +209,10 @@ __marimo__/
 # uv / virtual environment
 .venv/
 uv.lock
+
+# Custom ignores
+evaluation_output.txt
+tmp_*.py
+tmp_output.txt
+git_status.txt
+git_diff.txt
