@@ -35,11 +35,12 @@ from src.evaluation.metrics import evaluate_ranker
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
-N_NODES   = 20
-R0_VALUES = [0.5, 1.0, 2.0, 3.0, 5.0]
-N_RUNS    = 500       # cascades per R0
-BASE_SEED = 42
-OUT_DIR   = Path("results/figures")
+N_NODES      = 200
+R0_VALUES    = [0.5, 1.0, 2.0, 3.0, 5.0]
+CASCADE_SIZE = 20        # exact cascade size to collect
+N_TARGET     = 500       # cascades to collect per R0
+BASE_SEED    = 42
+OUT_DIR      = Path("results/figures")
 
 METHOD_LABELS = {
     "random_forest": "Random Forest",
@@ -53,35 +54,44 @@ METHOD_ORDER = list(METHOD_LABELS.keys())
 
 
 def generate_data() -> tuple[list[CascadeResult], list[float]]:
-    """Simulate IC cascades and keep track of R0 corresponding to each."""
+    """Simulate IC cascades, collecting exactly N_TARGET with size == CASCADE_SIZE per R₀.
+
+    Each simulation is stopped early once CASCADE_SIZE infected nodes are
+    reached.  Cascades that die out before hitting the target are discarded,
+    so lower R₀ values require more attempts.
+    """
     G = nx.complete_graph(N_NODES)
     avg_deg = float(N_NODES - 1)
     nodes = list(G.nodes())
     rng = random.Random(BASE_SEED)
-    
-    all_cascades = []
-    cascade_r0s = []
-    
-    print(f"Generating cascades: Complete K_{N_NODES}, {N_RUNS} runs per R0 ...")
-    
+
+    all_cascades: list[CascadeResult] = []
+    cascade_r0s: list[float] = []
+
+    print(f"Generating cascades: Complete K_{N_NODES}, "
+          f"{N_TARGET} cascades of size {CASCADE_SIZE} per R0 ...")
+
     seed = BASE_SEED
     for r0 in R0_VALUES:
         p = r0_to_params(r0, avg_deg, model="IC")["p"]
         model = IndependentCascade(p=p)
-        
-        count_valid = 0
-        for _ in range(N_RUNS):
+
+        collected = 0
+        attempts = 0
+        while collected < N_TARGET:
             source = rng.choice(nodes)
-            cascade = model.run(G, source=source, seed=seed)
+            cascade = model.run(G, source=source, seed=seed, max_size=CASCADE_SIZE)
             seed += 1
-            
-            if cascade.size >= 3: # Keep reasonably sized cascades
+            attempts += 1
+
+            if cascade.size >= CASCADE_SIZE:
                 all_cascades.append(cascade)
                 cascade_r0s.append(r0)
-                count_valid += 1
-                
-        print(f"  R0={r0:.1f} → generated {count_valid} non-trivial cascades (size >= 3)")
-        
+                collected += 1
+
+        print(f"  R0={r0:.1f}  p={p:.6f}  collected {collected}/{N_TARGET} "
+              f"(attempts={attempts}, hit-rate={collected/attempts:.2%})")
+
     return all_cascades, cascade_r0s
 
 

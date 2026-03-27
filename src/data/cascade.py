@@ -193,7 +193,7 @@ class IndependentCascade:
     def __init__(self, p: float = 0.1):
         self.p = p
 
-    def run(self, G: nx.Graph, source: int, seed: int | None = None) -> CascadeResult:
+    def run(self, G: nx.Graph, source: int, seed: int | None = None, max_size: int | None = None) -> CascadeResult:
         rng = random.Random(seed)
         infection_times: dict[int, int] = {source: 0}
         cascade_edges: list[tuple[int, int]] = []
@@ -208,6 +208,12 @@ class IndependentCascade:
                         infection_times[neighbor] = t
                         cascade_edges.append((node, neighbor))
                         next_wave.append(neighbor)
+                        if max_size is not None and len(infection_times) >= max_size:
+                            break
+                if max_size is not None and len(infection_times) >= max_size:
+                    break
+            if max_size is not None and len(infection_times) >= max_size:
+                break
             newly_infected = next_wave
         return CascadeResult(
             source=source, model_name="IC", params={"p": self.p},
