@@ -1,0 +1,5 @@
+# Optional dependencies for running Jupyter notebooks in notebooks/
+# Install with: pip install -r requirements-notebooks.txt
+#
+-r requirements.txt
+jupyter>=1.0.0
