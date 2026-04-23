@@ -1,15 +1,15 @@
 #!/usr/bin/env python
 """
-scripts/train_rf_ic_complete.py
+scripts/train_rf_ic_er.py
 ================================
 Train a Random Forest on node structural features to predict Patient Zero
-in IC cascades on a 20-node complete graph.
+in IC cascades on a 200-node Erdős–Rényi graph.
 
 Evaluates the RF against standard centrality baselines and plots the results.
 
 Usage
 -----
-    python -m scripts.train_rf_ic_complete
+    python -m scripts.train_rf_ic_er
 """
 from __future__ import annotations
 
@@ -27,6 +27,7 @@ import pandas as pd
 from sklearn.model_selection import StratifiedGroupKFold
 
 from src.data.cascade import r0_to_params, IndependentCascade, CascadeResult
+from src.data.networks import generate_er_network
 from src.features.preprocess import filter_trivial
 from src.features.extract import build_feature_matrix
 from src.models.random_forest import SourceRandomForest
@@ -36,11 +37,12 @@ from src.evaluation.metrics import evaluate_ranker
 # ── Configuration ─────────────────────────────────────────────────────────────
 
 N_NODES      = 200
+ER_P         = 0.03
 R0_VALUES    = [0.5, 1.0, 2.0, 3.0, 5.0]
 CASCADE_SIZE = 20        # exact cascade size to collect
 N_TARGET     = 500       # cascades to collect per R0
 BASE_SEED    = 42
-OUT_DIR      = Path("results/figures")
+OUT_DIR      = Path("results/figures/ml_evaluation")
 
 METHOD_LABELS = {
     "random_forest": "Random Forest",
@@ -60,16 +62,17 @@ def generate_data() -> tuple[list[CascadeResult], list[float]]:
     reached.  Cascades that die out before hitting the target are discarded,
     so lower R₀ values require more attempts.
     """
-    G = nx.complete_graph(N_NODES)
-    avg_deg = float(N_NODES - 1)
+    G = generate_er_network(n=N_NODES, p=ER_P, seed=BASE_SEED)
+    avg_deg = float(np.mean([d for _, d in G.degree()]))
     nodes = list(G.nodes())
     rng = random.Random(BASE_SEED)
 
     all_cascades: list[CascadeResult] = []
     cascade_r0s: list[float] = []
 
-    print(f"Generating cascades: Complete K_{N_NODES}, "
+    print(f"Generating cascades: Erdos-Renyi G({N_NODES}, {ER_P}), "
           f"{N_TARGET} cascades of size {CASCADE_SIZE} per R0 ...")
+    print(f"Graph properties: N={G.number_of_nodes()}, edges={G.number_of_edges()}, avg_deg={avg_deg:.2f}")
 
     seed = BASE_SEED
     for r0 in R0_VALUES:
@@ -237,10 +240,10 @@ def _plot_accuracy(metrics_by_r0: dict[float, dict[str, dict]]) -> None:
         for sp in ax.spines.values(): sp.set_edgecolor("#444")
 
     plt.tight_layout()
-    out_file = OUT_DIR / "rf_vs_baselines_complete_ic.png"
+    out_file = OUT_DIR / "rf_vs_baselines_er_ic.png"
     fig.savefig(out_file, dpi=150, facecolor=fig.get_facecolor(), bbox_inches="tight")
     plt.close(fig)
-    print(f"\nSaved accuracy plot   → {out_file}")
+    print(f"\nSaved accuracy plot   -> {out_file}")
 
 
 def _plot_feature_importances(rf: SourceRandomForest) -> None:
@@ -259,15 +262,15 @@ def _plot_feature_importances(rf: SourceRandomForest) -> None:
     ax.set_yticks(y_pos)
     ax.set_yticklabels(features, color="lightgray")
     ax.set_xlabel("Mean Decrease in Impurity (Gini)", color="lightgray")
-    ax.set_title("Random Forest — Feature Importances", color="white", fontweight="bold")
+    ax.set_title("Random Forest - Feature Importances (ER)", color="white", fontweight="bold")
     ax.tick_params(colors="lightgray")
     for sp in ax.spines.values(): sp.set_edgecolor("#444")
         
     plt.tight_layout()
-    out_file = OUT_DIR / "rf_feature_importance_complete_ic.png"
+    out_file = OUT_DIR / "rf_feature_importance_er_ic.png"
     fig.savefig(out_file, dpi=150, facecolor=fig.get_facecolor())
     plt.close(fig)
-    print(f"Saved importance plot → {out_file}")
+    print(f"Saved importance plot -> {out_file}")
 
 
 if __name__ == "__main__":

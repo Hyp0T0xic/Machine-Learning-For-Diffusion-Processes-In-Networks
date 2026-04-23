@@ -50,7 +50,7 @@ N_NODES   = 20
 R0_VALUES = [0.5, 1.0, 2.0, 3.0, 5.0]
 N_RUNS    = 200        # cascades per R₀  (only non-trivial ones are evaluated)
 BASE_SEED = 42
-OUT_DIR   = Path("results/figures")
+OUT_DIR   = Path("results/figures/ml_evaluation")
 OUT_FILE  = OUT_DIR / "patient_zero_prediction_accuracy.png"
 
 METHOD_LABELS = {

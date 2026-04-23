@@ -29,7 +29,7 @@ from src.visualization.cascades import plot_cascade_tree, plot_comparison_grid
 
 NETWORK_DIR = "data/networks"
 CASCADE_DIR = "data/raw"
-VIZ_DIR     = "results/figures"
+VIZ_DIR     = "results/figures/cascades"
 
 NETWORK_FILES = {
     "ER":       f"{NETWORK_DIR}/er_network.graphml",

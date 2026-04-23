@@ -17,7 +17,7 @@ from src.data.networks import generate_all_networks, compute_network_stats, save
 from src.visualization.networks import visualize_networks
 
 DATA_DIR = "data/networks"
-FIG_DIR = "results/figures"
+FIG_DIR = "results/figures/networks"
 
 
 def main() -> None:
