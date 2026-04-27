@@ -18,10 +18,12 @@ from src.features.extract import extract_node_features
 class SourceRandomForest:
     """Random Forest model to predict the source node of a cascade."""
     
-    def __init__(self, n_estimators: int = 100, max_depth: int | None = 10, random_state: int = 42, **kwargs):
+    def __init__(self, n_estimators: int = 100, max_depth: int | None = 10,
+                 min_samples_leaf: int = 5, random_state: int = 42, **kwargs):
         self.clf = RandomForestClassifier(
             n_estimators=n_estimators,
             max_depth=max_depth,
+            min_samples_leaf=min_samples_leaf,  # Smooth probability estimates
             random_state=random_state,
             class_weight="balanced",  # Critical: source vs non-source is highly imbalanced
             **kwargs

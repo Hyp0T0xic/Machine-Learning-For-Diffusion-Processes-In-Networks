@@ -49,15 +49,12 @@ def extract_node_features(result: CascadeResult) -> dict[int, dict[str, float]]:
     if G.number_of_nodes() == 0:
         return {}
 
+    cascade_size = G.number_of_nodes()
+
     # 1. Standard Centralities
-    degree_c = nx.degree_centrality(G)
-    closeness_c = nx.closeness_centrality(G)
-    # Betweenness is expensive but acceptable for small graphs (e.g. N=20)
     betweenness_c = nx.betweenness_centrality(G, normalized=True)
-    clustering = nx.clustering(G)
 
     # 2. Distance to Jordan Center
-    # Handle disconnected graph components explicitly
     jordan_centers = []
     eccentricities = {}
     try:
@@ -74,16 +71,15 @@ def extract_node_features(result: CascadeResult) -> dict[int, dict[str, float]]:
             except Exception:
                 pass
 
-    # Precompute shortest paths for all pairs to answer queries quickly
     all_pairs_lengths = dict(nx.all_pairs_shortest_path_length(G))
 
-    # 3. Global Context Features
-    cascade_size = G.number_of_nodes()
-    # A leaf in an undirected strictly connected tree has degree 1
-    # For isolated nodes, degree is 0. We'll count degree <= 1 as leaves.
-    num_leaves = sum(1 for n in G.nodes() if G.degree(n) <= 1)
+    if eccentricities:
+        cascade_diameter = max(eccentricities.values())
+    else:
+        cascade_diameter = cascade_size
 
-    features: dict[int, dict[str, float]] = {}
+    # 3. Calculate raw absolute features first
+    raw_features: dict[int, dict[str, float]] = {}
     
     for node in G.nodes():
         # Distance to closest Jordan Center
@@ -92,30 +88,41 @@ def extract_node_features(result: CascadeResult) -> dict[int, dict[str, float]]:
             if dist_to_jc == float('inf'): dist_to_jc = cascade_size  # Fallback
         else:
             dist_to_jc = cascade_size
-            
-        # Two-hop neighborhood count (including self)
-        if node in all_pairs_lengths:
-            two_hop_count = sum(1 for d in all_pairs_lengths[node].values() if d <= 2)
-        else:
-            two_hop_count = 1
 
-        # Subtree depth (if we root the observed graph at 'node')
-        # This is exactly the eccentricity of the node.
-        subtree_depth = eccentricities.get(node, cascade_size)
-
-        features[node] = {
+        raw_features[node] = {
             "degree": float(G.degree(node)),
-            "degree_centrality": degree_c.get(node, 0.0),
-            "closeness_centrality": closeness_c.get(node, 0.0),
-            "betweenness_centrality": betweenness_c.get(node, 0.0),
+            "betweenness": betweenness_c.get(node, 0.0),
             "eccentricity": float(eccentricities.get(node, cascade_size)),
             "jordan_center_dist": float(dist_to_jc),
-            "clustering": clustering.get(node, 0.0),
-            "two_hop_count": float(two_hop_count),
-            "subtree_depth": float(subtree_depth),
-            "cascade_size": float(cascade_size),
-            "num_leaves": float(num_leaves),
+            "cascade_diameter": float(cascade_diameter),
         }
+
+    # 4. Z-score normalization for the ranking features
+    features: dict[int, dict[str, float]] = {}
+    
+    # We want to z-score structural features; keep geometric ones absolute
+    zscore_keys = ["degree", "betweenness", "eccentricity"]
+    
+    # Calculate mean and std for each feature
+    stats = {}
+    for key in zscore_keys:
+        vals = [raw_features[n][key] for n in G.nodes()]
+        stats[key] = {"mean": np.mean(vals), "std": np.std(vals)}
+
+    for node in G.nodes():
+        node_feats = {}
+        for key in zscore_keys:
+            mean = stats[key]["mean"]
+            std = stats[key]["std"]
+            val = raw_features[node][key]
+            # If std is 0 (all nodes have identical value), z-score is 0
+            node_feats[f"{key}_zscore"] = float((val - mean) / std) if std > 1e-8 else 0.0
+            
+        # Keep absolute features
+        node_feats["jordan_center_dist"] = raw_features[node]["jordan_center_dist"]
+        node_feats["cascade_diameter"] = raw_features[node]["cascade_diameter"]
+        
+        features[node] = node_feats
 
     return features
 
