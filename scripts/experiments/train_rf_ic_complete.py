@@ -38,7 +38,7 @@ from src.evaluation.metrics import evaluate_ranker
 N_NODES      = 200
 R0_VALUES    = [0.5, 1.0, 2.0, 3.0, 5.0]
 CASCADE_SIZE = 20        # exact cascade size to collect
-N_TARGET     = 500       # cascades to collect per R0
+N_TARGET     = 1000      # cascades to collect per R0
 BASE_SEED    = 42
 OUT_DIR      = Path("results/figures/ml_evaluation")
 
@@ -259,7 +259,7 @@ def _plot_feature_importances(rf: SourceRandomForest) -> None:
     ax.set_yticks(y_pos)
     ax.set_yticklabels(features, color="lightgray")
     ax.set_xlabel("Mean Decrease in Impurity (Gini)", color="lightgray")
-    ax.set_title("Random Forest — Feature Importances", color="white", fontweight="bold")
+    ax.set_title("Random Forest - Feature Importances", color="white", fontweight="bold")
     ax.tick_params(colors="lightgray")
     for sp in ax.spines.values(): sp.set_edgecolor("#444")
         
