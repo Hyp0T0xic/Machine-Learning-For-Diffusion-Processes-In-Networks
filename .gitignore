@@ -216,3 +216,6 @@ tmp_*.py
 tmp_output.txt
 git_status.txt
 git_diff.txt
+note.txt
+mlruns.db
+mlruns/
