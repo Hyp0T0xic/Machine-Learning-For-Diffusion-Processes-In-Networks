@@ -19,6 +19,7 @@ from pathlib import Path
 from collections import defaultdict
 
 import matplotlib
+import mlflow
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -214,6 +215,9 @@ def print_results(avg_metrics: dict, cascade_size: int) -> None:
 
 def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
+    
+    mlflow.set_tracking_uri("sqlite:///mlruns.db")
+    mlflow.set_experiment("Random_Forest_BA_IC")
 
     for cascade_size in CASCADE_SIZES:
         print(f"\n\n{'#'*80}")
@@ -234,11 +238,30 @@ def main() -> None:
 
         print_results(avg_metrics, cascade_size)
 
-        _plot_accuracy(avg_metrics, cascade_size)
-        _plot_feature_importances(avg_importances, cascade_size)
+        with mlflow.start_run(run_name=f"BA_size{cascade_size}_{len(SEEDS)}seeds"):
+            mlflow.log_params({
+                "N_NODES": N_NODES,
+                "BA_M": BA_M,
+                "CASCADE_SIZE": cascade_size,
+                "N_TARGET": N_TARGET,
+                "NUM_SEEDS": len(SEEDS),
+                "FEATURES": " + ".join(sorted(avg_importances.keys()))
+            })
+
+            for r0 in R0_VALUES:
+                for method in ["random_forest", "jordan"]:
+                    m = avg_metrics.get(r0, {}).get(method)
+                    if m:
+                        mlflow.log_metric(f"{method}_Top1_R0_{r0}", m["top_k"][1] * 100)
+                        mlflow.log_metric(f"{method}_Top3_R0_{r0}", m["top_k"][3] * 100)
+
+            acc_plot = _plot_accuracy(avg_metrics, cascade_size)
+            imp_plot = _plot_feature_importances(avg_importances, cascade_size)
+            if acc_plot: mlflow.log_artifact(str(acc_plot))
+            if imp_plot: mlflow.log_artifact(str(imp_plot))
 
 
-def _plot_accuracy(avg_metrics: dict, cascade_size: int) -> None:
+def _plot_accuracy(avg_metrics: dict, cascade_size: int) -> Path:
     fig, axes = plt.subplots(2, 1, figsize=(12, 10))
     fig.patch.set_facecolor("#0d0d1a")
 
@@ -294,11 +317,12 @@ def _plot_accuracy(avg_metrics: dict, cascade_size: int) -> None:
     fig.savefig(out_file, dpi=150, facecolor=fig.get_facecolor(), bbox_inches="tight")
     plt.close(fig)
     print(f"\nSaved accuracy plot   -> {out_file}")
+    return out_file
 
 
-def _plot_feature_importances(avg_importances: dict, cascade_size: int) -> None:
+def _plot_feature_importances(avg_importances: dict, cascade_size: int) -> Path | None:
     if not avg_importances:
-        return
+        return None
 
     sorted_imp = sorted(avg_importances.items(), key=lambda x: x[1])
     features, scores = zip(*sorted_imp)
@@ -322,6 +346,7 @@ def _plot_feature_importances(avg_importances: dict, cascade_size: int) -> None:
     fig.savefig(out_file, dpi=150, facecolor=fig.get_facecolor())
     plt.close(fig)
     print(f"Saved importance plot -> {out_file}")
+    return out_file
 
 
 if __name__ == "__main__":
