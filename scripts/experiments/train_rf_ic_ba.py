@@ -41,7 +41,7 @@ BA_M          = 3
 R0_VALUES     = [0.5, 1.0, 2.0, 3.0, 5.0]
 CASCADE_SIZES = [30]         # run both sizes for comparison
 N_TARGET      = 1500         # cascades to collect per R0
-SEEDS         = [42]
+SEEDS         = [42, 123, 456, 789, 1024]
 OUT_DIR       = Path("results/figures/ml_evaluation")
 
 METHOD_LABELS = {
@@ -123,7 +123,7 @@ def run_single_seed(seed: int, cascade_size: int) -> tuple[dict, dict]:
         max_depth=10,
         min_samples_leaf=10,
         min_samples_split=5,
-        max_features='log2',
+        max_features= 3,
         random_state=seed
     )
     rf.fit(X_train, y_train, feature_names)
