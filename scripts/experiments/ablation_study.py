@@ -128,7 +128,8 @@ def main():
             min_samples_leaf=10,
             min_samples_split=5,
             max_features=mf,
-            random_state=SEED
+            random_state=SEED,
+            n_jobs=-1
         )
         
         # Train
