@@ -25,6 +25,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from sklearn.model_selection import StratifiedGroupKFold, RandomizedSearchCV
 from sklearn.ensemble import RandomForestClassifier
+from src.models.random_forest import SourceRandomForest
+import mlflow
+from src.evaluation.metrics import evaluate_ranker
+from collections import defaultdict
 from sklearn.metrics import (
     classification_report, 
     roc_auc_score, 
@@ -55,6 +59,7 @@ def generate_mixed_data(seed: int) -> list[CascadeResult]:
     rng = random.Random(seed)
 
     all_cascades = []
+    all_r0s = []
     sim_seed = seed * 1000
 
     print(f"Generating {N_TARGET} cascades of size {CASCADE_SIZE} per R0 for tuning...")
@@ -70,17 +75,18 @@ def generate_mixed_data(seed: int) -> list[CascadeResult]:
             attempts += 1
             if c.size >= CASCADE_SIZE:
                 all_cascades.append(c)
+                all_r0s.append(r0)
                 collected += 1
         print(f"  R0={r0:.1f} collected {collected} (attempts={attempts})")
 
-    return all_cascades
+    return all_cascades, all_r0s
 
 
 def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     
     # 1. Generate Data
-    cascades = generate_mixed_data(SEED)
+    cascades, r0s = generate_mixed_data(SEED)
     X, y, index, feature_names = build_feature_matrix(cascades)
     groups = [idx[0] for idx in index]  # cascade_id for grouping
 
@@ -106,7 +112,7 @@ def main():
         'max_depth': [None, 10, 20, 30],
         'min_samples_split': [2, 5, 10],
         'min_samples_leaf': [1, 2, 5, 10],
-        'max_features': ['sqrt', 'log2', None]
+        'max_features': [2, 3, None]
     }
     
     base_rf = RandomForestClassifier(class_weight="balanced", random_state=SEED)
@@ -117,15 +123,19 @@ def main():
     search = RandomizedSearchCV(
         base_rf,
         param_distributions=param_distributions,
-        n_iter=15,  # Try 15 random combinations (increase for more thorough search)
+        n_iter=50,  # Try 50 random combinations (increase for more thorough search)
         scoring='average_precision',
         cv=sgkf_inner,
-        n_jobs=-1,  # Use all CPU cores
-        verbose=1,
+        n_jobs=1,  # Safe for Windows without crashing the terminal
+        verbose=3,
         random_state=SEED
     )
     
     print("\nStarting Hyperparameter Tuning (RandomizedSearchCV)...")
+    mlflow.set_tracking_uri("sqlite:///mlruns.db")
+    mlflow.set_experiment("Random_Forest_Tuning_BA")
+    mlflow.sklearn.autolog()
+    
     # Note: We must pass groups_train to fit so the inner CV splits properly
     search.fit(X_train, y_train, groups=groups_train)
     
@@ -151,7 +161,40 @@ def main():
     print(f"ROC AUC Score: {roc_auc:.4f}")
     print(f"PR AUC Score:  {pr_auc:.4f}")
 
-    # 5. Plot ROC and PR Curves
+    # 5. Evaluate per-R0 ranking metrics
+    print("\n--- Per-R0 Ranking Metrics ---")
+    test_cascade_indices = sorted(set(groups[i] for i in test_idx))
+    test_cascades = [cascades[i] for i in test_cascade_indices]
+    test_r0s = [r0s[i] for i in test_cascade_indices]
+
+    with mlflow.start_run(run_name="Best_Model_Evaluation"):
+        mlflow.log_params(search.best_params_)
+        
+        source_rf = SourceRandomForest()
+        source_rf.clf = best_model
+        source_rf._feature_names = feature_names
+
+        for eval_r0 in R0_VALUES:
+            r0_indices = [i for i, r in enumerate(test_r0s) if r == eval_r0]
+            if not r0_indices:
+                continue
+            
+            subset_cascades = [test_cascades[i] for i in r0_indices]
+            
+            rf_rankings = [source_rf.rank_nodes(c) for c in subset_cascades]
+            metrics = evaluate_ranker(subset_cascades, rf_rankings, ks=[1, 3])
+            
+            top1 = metrics["top_k"][1] * 100
+            top3 = metrics["top_k"][3] * 100
+            mrr = metrics["mrr"]
+            print(f"R0={eval_r0}: Top-1: {top1:.1f}%, Top-3: {top3:.1f}%, MRR: {mrr:.3f}")
+            
+            step = int(eval_r0 * 10)
+            mlflow.log_metric("Top1_Accuracy", top1, step=step)
+            mlflow.log_metric("Top3_Accuracy", top3, step=step)
+            mlflow.log_metric("MRR", mrr, step=step)
+
+    # 6. Plot ROC and PR Curves
     fig, (ax_roc, ax_pr) = plt.subplots(1, 2, figsize=(14, 6))
     fig.patch.set_facecolor("#0d0d1a")
     
