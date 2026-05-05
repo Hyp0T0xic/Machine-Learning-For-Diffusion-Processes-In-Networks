@@ -57,8 +57,13 @@ class SourceRandomForest:
         
         probs = self.predict_proba(X)
         
-        # Sort nodes by probability descending
-        ranked_pairs = sorted(zip(nodes, probs), key=lambda x: x[1], reverse=True)
+        # Zip nodes and probs, then shuffle to ensure random tie-breaking
+        import random
+        pairs = list(zip(nodes, probs))
+        random.shuffle(pairs)
+        
+        # Sort nodes by probability descending (stable sort won't leak insertion order now)
+        ranked_pairs = sorted(pairs, key=lambda x: x[1], reverse=True)
         return [n for n, p in ranked_pairs]
 
     @property
