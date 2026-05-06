@@ -81,7 +81,9 @@ class CascadeResult:
         Edge directions are dropped to simulate partial observability.
         """
         G = nx.Graph()
-        G.add_nodes_from(self.infection_times.keys())
+        # Sort nodes to destroy insertion order (which leaks the true source)
+        nodes = sorted(self.infection_times.keys())
+        G.add_nodes_from(nodes)
         for u, v in self.cascade_edges:
             G.add_edge(u, v)
         return G
