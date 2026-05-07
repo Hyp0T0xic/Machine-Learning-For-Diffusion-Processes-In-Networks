@@ -3,9 +3,9 @@
 scripts/experiments/train_rf_ic_er.py
 =====================================
 Train a Random Forest on node structural features to predict Patient Zero
-in IC cascades on 200-node Erdos-Renyi graphs.
+in IC cascades on 200-node Erdős–Rényi graphs.
 
-Runs across MULTIPLE network seeds and CASCADE SIZES, averaging the results
+Runs across MULTIPLE network seeds, averaging the results
 for statistical robustness.
 
 Usage
@@ -19,11 +19,13 @@ from pathlib import Path
 from collections import defaultdict
 
 import matplotlib
+import mlflow
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 from sklearn.model_selection import StratifiedGroupKFold
+import joblib
 
 from src.data.cascade import r0_to_params, IndependentCascade, CascadeResult
 from src.data.networks import generate_er_network
@@ -36,11 +38,11 @@ from src.evaluation.metrics import evaluate_ranker
 # -- Configuration -----------------------------------------------------------
 
 N_NODES       = 200
-ER_P          = 0.03
+ER_P          = 6 / (N_NODES - 1)   # match BA avg degree ≈ 6
 R0_VALUES     = [0.5, 1.0, 2.0, 3.0, 5.0]
-CASCADE_SIZES = [20]         # only size 20 to save time
-N_TARGET      = 1500         # cascades to collect per R0
-SEEDS         = [42]         # just one seed as requested
+CASCADE_SIZES = [25]
+N_TARGET      = 1000
+SEEDS         = [42, 123, 456, 789, 1024]
 OUT_DIR       = Path("results/figures/ml_evaluation")
 
 METHOD_LABELS = {
@@ -65,6 +67,7 @@ def generate_data(seed: int, cascade_size: int) -> tuple[list[CascadeResult], li
     cascade_r0s: list[float] = []
 
     print(f"    Generating {N_TARGET} cascades of size {cascade_size} per R0 ...")
+    print(f"    ER network: n={G.number_of_nodes()}, p={ER_P:.4f}, avg_deg={avg_deg:.2f}")
 
     sim_seed = seed * 100_000
     for r0 in R0_VALUES:
@@ -83,6 +86,9 @@ def generate_data(seed: int, cascade_size: int) -> tuple[list[CascadeResult], li
                 all_cascades.append(cascade)
                 cascade_r0s.append(r0)
                 collected += 1
+                
+            if attempts % 100_000 == 0:
+                print(f"        ... [R0={r0:.1f}] {collected}/{N_TARGET} collected ({attempts:,} attempts so far)")
 
         print(f"      R0={r0:.1f}  p={p:.6f}  collected {collected} "
               f"(attempts={attempts}, hit-rate={collected/attempts:.2%})")
@@ -101,7 +107,7 @@ def evaluate_random_baseline(results: list[CascadeResult], seed: int = 42) -> di
     return evaluate_ranker(results, random_rankings, ks=[1, 3])
 
 
-def run_single_seed(seed: int, cascade_size: int) -> tuple[dict, dict]:
+def run_single_seed(seed: int, cascade_size: int) -> tuple[dict, dict, object]:
     """Run the full pipeline for one seed and cascade size."""
     # 1. Generate Data
     cascades, r0s = generate_data(seed, cascade_size)
@@ -117,7 +123,14 @@ def run_single_seed(seed: int, cascade_size: int) -> tuple[dict, dict]:
     X_train, y_train = X[train_idx], y[train_idx]
 
     # Train model
-    rf = SourceRandomForest(n_estimators=500, max_depth=None, random_state=seed)
+    rf = SourceRandomForest(
+        n_estimators=500,
+        max_depth=10,
+        min_samples_leaf=10,
+        min_samples_split=5,
+        max_features= 3,
+        random_state=seed
+    )
     rf.fit(X_train, y_train, feature_names)
 
     # Setup test set cascades
@@ -151,7 +164,7 @@ def run_single_seed(seed: int, cascade_size: int) -> tuple[dict, dict]:
         # Random
         metrics_by_r0[eval_r0]["random"] = evaluate_random_baseline(subset_cascades, seed=seed)
 
-    return dict(metrics_by_r0), rf.feature_importances
+    return dict(metrics_by_r0), rf.feature_importances, rf
 
 
 def aggregate_metrics(all_seed_metrics: list[dict]) -> dict:
@@ -185,7 +198,7 @@ def aggregate_importances(all_seed_importances: list[dict]) -> dict:
 def print_results(avg_metrics: dict, cascade_size: int) -> None:
     """Print averaged results table."""
     print(f"\n{'='*105}")
-    print(f"  CASCADE SIZE = {cascade_size} | ERDOS-RENYI | AVERAGED OVER {len(SEEDS)} SEEDS")
+    print(f"  ER + IC | CASCADE SIZE = {cascade_size} | AVERAGED OVER {len(SEEDS)} SEEDS")
     print(f"{'='*105}")
     print(f"{'Method':<18}  " + "   ".join(f"R0={r:>3.1f}" for r in R0_VALUES))
     print(" " * 18 + "  " + "  ".join("Top1   Top3 " for _ in R0_VALUES))
@@ -207,31 +220,68 @@ def print_results(avg_metrics: dict, cascade_size: int) -> None:
 
 def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
+    
+    # Ensure MLflow logs to the project root database regardless of where script is run
+    project_root = Path(__file__).resolve().parent.parent.parent
+    db_path = project_root / "mlruns.db"
+    mlflow.set_tracking_uri(f"sqlite:///{db_path}")
+    mlflow.set_experiment("Random_Forest_ER_IC")
 
     for cascade_size in CASCADE_SIZES:
         print(f"\n\n{'#'*80}")
-        print(f"  RUNNING ERDOS-RENYI CASCADE SIZE = {cascade_size}")
+        print(f"  RUNNING ER + IC | CASCADE SIZE = {cascade_size}")
         print(f"{'#'*80}")
 
         all_seed_metrics: list[dict] = []
         all_seed_importances: list[dict] = []
 
+        all_models = []
+
         for i, seed in enumerate(SEEDS):
             print(f"\n  -- SEED {i+1}/{len(SEEDS)}: {seed} --")
-            metrics, importances = run_single_seed(seed, cascade_size)
+            metrics, importances, model = run_single_seed(seed, cascade_size)
             all_seed_metrics.append(metrics)
             all_seed_importances.append(importances)
+            all_models.append(model)
+            print(f"  -- SEED {seed} COMPLETED --")
 
         avg_metrics = aggregate_metrics(all_seed_metrics)
         avg_importances = aggregate_importances(all_seed_importances)
 
         print_results(avg_metrics, cascade_size)
 
-        _plot_accuracy(avg_metrics, cascade_size)
-        _plot_feature_importances(avg_importances, cascade_size)
+        with mlflow.start_run(run_name=f"ER_IC_size{cascade_size}_{len(SEEDS)}seeds"):
+            mlflow.log_params({
+                "N_NODES": N_NODES,
+                "ER_P": round(ER_P, 4),
+                "CASCADE_SIZE": cascade_size,
+                "N_TARGET": N_TARGET,
+                "NUM_SEEDS": len(SEEDS),
+                "FEATURES": " + ".join(sorted(avg_importances.keys()))
+            })
+
+            for r0 in R0_VALUES:
+                for method in ["random_forest", "jordan"]:
+                    m = avg_metrics.get(r0, {}).get(method)
+                    if m:
+                        mlflow.log_metric(f"{method}_Top1_R0_{r0}", m["top_k"][1] * 100)
+                        mlflow.log_metric(f"{method}_Top3_R0_{r0}", m["top_k"][3] * 100)
+
+            acc_plot = _plot_accuracy(avg_metrics, cascade_size)
+            imp_plot = _plot_feature_importances(avg_importances, cascade_size)
+            if acc_plot: mlflow.log_artifact(str(acc_plot))
+            if imp_plot: mlflow.log_artifact(str(imp_plot))
+
+            # Save the first seed's model as the representative model
+            model_dir = Path("results/models/ic_er")
+            model_dir.mkdir(parents=True, exist_ok=True)
+            model_path = model_dir / f"rf_model_size{cascade_size}.pkl"
+            joblib.dump(all_models[0], model_path)
+            mlflow.sklearn.log_model(all_models[0].clf, "random_forest_model")
+            print(f"\nSaved representative model -> {model_path}")
 
 
-def _plot_accuracy(avg_metrics: dict, cascade_size: int) -> None:
+def _plot_accuracy(avg_metrics: dict, cascade_size: int) -> Path:
     fig, axes = plt.subplots(2, 1, figsize=(12, 10))
     fig.patch.set_facecolor("#0d0d1a")
 
@@ -252,8 +302,8 @@ def _plot_accuracy(avg_metrics: dict, cascade_size: int) -> None:
                           len(METHOD_ORDER))
 
     for ax, k_measure, title in zip(axes, [1, 3],
-            [f"Top-1 Accuracy (Mean over {len(SEEDS)} seeds, size={cascade_size}, ER)",
-             f"Top-3 Accuracy (Mean over {len(SEEDS)} seeds, size={cascade_size}, ER)"]):
+            [f"Top-1 Accuracy — IC on ER (Mean over {len(SEEDS)} seeds, size={cascade_size})",
+             f"Top-3 Accuracy — IC on ER (Mean over {len(SEEDS)} seeds, size={cascade_size})"]):
         ax.set_facecolor("#1a1a2e")
         for i, method in enumerate(METHOD_ORDER):
             vals = []
@@ -287,11 +337,12 @@ def _plot_accuracy(avg_metrics: dict, cascade_size: int) -> None:
     fig.savefig(out_file, dpi=150, facecolor=fig.get_facecolor(), bbox_inches="tight")
     plt.close(fig)
     print(f"\nSaved accuracy plot   -> {out_file}")
+    return out_file
 
 
-def _plot_feature_importances(avg_importances: dict, cascade_size: int) -> None:
+def _plot_feature_importances(avg_importances: dict, cascade_size: int) -> Path | None:
     if not avg_importances:
-        return
+        return None
 
     sorted_imp = sorted(avg_importances.items(), key=lambda x: x[1])
     features, scores = zip(*sorted_imp)
@@ -305,7 +356,7 @@ def _plot_feature_importances(avg_importances: dict, cascade_size: int) -> None:
     ax.set_yticks(y_pos)
     ax.set_yticklabels(features, color="lightgray")
     ax.set_xlabel(f"Mean Decrease in Impurity (Gini, avg over {len(SEEDS)} seeds)", color="lightgray")
-    ax.set_title(f"Random Forest - Feature Importances (ER, size={cascade_size})",
+    ax.set_title(f"Random Forest — Feature Importances (IC on ER, size={cascade_size})",
                  color="white", fontweight="bold")
     ax.tick_params(colors="lightgray")
     for sp in ax.spines.values(): sp.set_edgecolor("#444")
@@ -315,6 +366,7 @@ def _plot_feature_importances(avg_importances: dict, cascade_size: int) -> None:
     fig.savefig(out_file, dpi=150, facecolor=fig.get_facecolor())
     plt.close(fig)
     print(f"Saved importance plot -> {out_file}")
+    return out_file
 
 
 if __name__ == "__main__":
