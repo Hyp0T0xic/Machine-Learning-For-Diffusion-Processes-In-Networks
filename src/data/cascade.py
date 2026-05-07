@@ -236,7 +236,8 @@ class SIModel:
         self.beta = beta
 
     def run(
-        self, G: nx.Graph, source: int, seed: int | None = None, max_steps: int = 200
+        self, G: nx.Graph, source: int, seed: int | None = None, max_steps: int = 200,
+        max_size: int | None = None,
     ) -> CascadeResult:
         rng = random.Random(seed)
         infection_times: dict[int, int] = {source: 0}
@@ -249,12 +250,18 @@ class SIModel:
                     if neighbor not in infection_times and neighbor not in new_infections:
                         if rng.random() < self.beta:
                             new_infections[neighbor] = node
+                            if max_size is not None and len(infection_times) + len(new_infections) >= max_size:
+                                break
+                if max_size is not None and len(infection_times) + len(new_infections) >= max_size:
+                    break
             if not new_infections:
                 break
             for neighbor, infector in new_infections.items():
                 infection_times[neighbor] = t
                 cascade_edges.append((infector, neighbor))
                 infected.add(neighbor)
+            if max_size is not None and len(infection_times) >= max_size:
+                break
         return CascadeResult(
             source=source, model_name="SI", params={"beta": self.beta},
             infection_times=infection_times, cascade_edges=cascade_edges,

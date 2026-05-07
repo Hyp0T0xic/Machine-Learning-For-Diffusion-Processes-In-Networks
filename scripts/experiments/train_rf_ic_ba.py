@@ -25,6 +25,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 from sklearn.model_selection import StratifiedGroupKFold
+import joblib
 
 from src.data.cascade import r0_to_params, IndependentCascade, CascadeResult
 from src.data.networks import generate_ba_network
@@ -39,8 +40,8 @@ from src.evaluation.metrics import evaluate_ranker
 N_NODES       = 200
 BA_M          = 3
 R0_VALUES     = [0.5, 1.0, 2.0, 3.0, 5.0]
-CASCADE_SIZES = [30]         # run both sizes for comparison
-N_TARGET      = 1500         # cascades to collect per R0
+CASCADE_SIZES = [25]         # run both sizes for comparison
+N_TARGET      = 1000         # cascades to collect per R0
 SEEDS         = [42, 123, 456, 789, 1024]
 OUT_DIR       = Path("results/figures/ml_evaluation")
 
@@ -84,6 +85,9 @@ def generate_data(seed: int, cascade_size: int) -> tuple[list[CascadeResult], li
                 all_cascades.append(cascade)
                 cascade_r0s.append(r0)
                 collected += 1
+                
+            if attempts % 100_000 == 0:
+                print(f"        ... [R0={r0:.1f}] {collected}/{N_TARGET} collected ({attempts:,} attempts so far)")
 
         print(f"      R0={r0:.1f}  p={p:.6f}  collected {collected} "
               f"(attempts={attempts}, hit-rate={collected/attempts:.2%})")
@@ -102,7 +106,7 @@ def evaluate_random_baseline(results: list[CascadeResult], seed: int = 42) -> di
     return evaluate_ranker(results, random_rankings, ks=[1, 3])
 
 
-def run_single_seed(seed: int, cascade_size: int) -> tuple[dict, dict]:
+def run_single_seed(seed: int, cascade_size: int) -> tuple[dict, dict, object]:
     """Run the full pipeline for one seed and cascade size."""
     # 1. Generate Data
     cascades, r0s = generate_data(seed, cascade_size)
@@ -159,7 +163,7 @@ def run_single_seed(seed: int, cascade_size: int) -> tuple[dict, dict]:
         # Random
         metrics_by_r0[eval_r0]["random"] = evaluate_random_baseline(subset_cascades, seed=seed)
 
-    return dict(metrics_by_r0), rf.feature_importances
+    return dict(metrics_by_r0), rf.feature_importances, rf
 
 
 def aggregate_metrics(all_seed_metrics: list[dict]) -> dict:
@@ -216,7 +220,10 @@ def print_results(avg_metrics: dict, cascade_size: int) -> None:
 def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     
-    mlflow.set_tracking_uri("sqlite:///mlruns.db")
+    # Ensure MLflow logs to the project root database regardless of where script is run
+    project_root = Path(__file__).resolve().parent.parent.parent
+    db_path = project_root / "mlruns.db"
+    mlflow.set_tracking_uri(f"sqlite:///{db_path}")
     mlflow.set_experiment("Random_Forest_BA_IC")
 
     for cascade_size in CASCADE_SIZES:
@@ -227,11 +234,14 @@ def main() -> None:
         all_seed_metrics: list[dict] = []
         all_seed_importances: list[dict] = []
 
+        all_models = []
+
         for i, seed in enumerate(SEEDS):
             print(f"\n  -- SEED {i+1}/{len(SEEDS)}: {seed} --")
-            metrics, importances = run_single_seed(seed, cascade_size)
+            metrics, importances, model = run_single_seed(seed, cascade_size)
             all_seed_metrics.append(metrics)
             all_seed_importances.append(importances)
+            all_models.append(model)
 
         avg_metrics = aggregate_metrics(all_seed_metrics)
         avg_importances = aggregate_importances(all_seed_importances)
@@ -260,6 +270,14 @@ def main() -> None:
             if acc_plot: mlflow.log_artifact(str(acc_plot))
             if imp_plot: mlflow.log_artifact(str(imp_plot))
 
+            # Save the first seed's model as the representative model
+            model_dir = Path("results/models/ic_ba")
+            model_dir.mkdir(parents=True, exist_ok=True)
+            model_path = model_dir / f"rf_model_size{cascade_size}.pkl"
+            joblib.dump(all_models[0], model_path)
+            mlflow.sklearn.log_model(all_models[0].clf, "random_forest_model")
+            print(f"\nSaved representative model -> {model_path}")
+
 
 def _plot_accuracy(avg_metrics: dict, cascade_size: int) -> Path:
     fig, axes = plt.subplots(2, 1, figsize=(12, 10))
@@ -282,8 +300,8 @@ def _plot_accuracy(avg_metrics: dict, cascade_size: int) -> Path:
                           len(METHOD_ORDER))
 
     for ax, k_measure, title in zip(axes, [1, 3],
-            [f"Top-1 Accuracy (Mean over {len(SEEDS)} seeds, size={cascade_size})",
-             f"Top-3 Accuracy (Mean over {len(SEEDS)} seeds, size={cascade_size})"]):
+            [f"Top-1 Accuracy — IC on BA (Mean over {len(SEEDS)} seeds, size={cascade_size})",
+             f"Top-3 Accuracy — IC on BA (Mean over {len(SEEDS)} seeds, size={cascade_size})"]):
         ax.set_facecolor("#1a1a2e")
         for i, method in enumerate(METHOD_ORDER):
             vals = []
@@ -336,7 +354,7 @@ def _plot_feature_importances(avg_importances: dict, cascade_size: int) -> Path 
     ax.set_yticks(y_pos)
     ax.set_yticklabels(features, color="lightgray")
     ax.set_xlabel(f"Mean Decrease in Impurity (Gini, avg over {len(SEEDS)} seeds)", color="lightgray")
-    ax.set_title(f"Random Forest - Feature Importances (BA, size={cascade_size})",
+    ax.set_title(f"Random Forest — Feature Importances (IC on BA, size={cascade_size})",
                  color="white", fontweight="bold")
     ax.tick_params(colors="lightgray")
     for sp in ax.spines.values(): sp.set_edgecolor("#444")

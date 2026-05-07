@@ -220,3 +220,4 @@ note.txt
 mlruns.db
 mlruns/
 results/ablation_results_hpc.txt
+scripts/experiments/run_all_experiments.bat
