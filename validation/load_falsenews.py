@@ -1,12 +1,7 @@
 """
-validation.load_falsenews
-=========================
-Load FalseNews retweet cascades from the raw CSV and convert them
-into CascadeResult objects compatible with the existing ML pipeline.
-
-Each cascade is a retweet tree.  We strip edge direction and timestamps,
-truncate to a target size via BFS from the true root, and wrap the
-result in the same CascadeResult dataclass used by the simulated data.
+Load FalseNews retweet cascades from raw CSV and convert to CascadeResult
+objects for the ML pipeline. Strips edge direction + timestamps, truncates
+via BFS to match simulated cascade sizes.
 """
 from __future__ import annotations
 
@@ -23,7 +18,7 @@ CSV_PATH = Path("data/FalseNews_Code_Data/data/raw_data_anon.csv")
 
 
 def _bfs_truncate(tree: nx.DiGraph, root: int, target_size: int) -> list[int]:
-    """Return the first *target_size* nodes reachable from *root* in BFS order."""
+    """First N nodes from root in BFS order — mimics observing early spread."""
     visited: list[int] = []
     queue: deque[int] = deque([root])
     seen = {root}
@@ -43,20 +38,11 @@ def load_falsenews_cascades(
     min_size: int = 25,
     veracity: str | None = None,
 ) -> tuple[list[CascadeResult], list[dict]]:
-    """Load FalseNews retweet cascades and convert to CascadeResult format.
+    """Load and filter FalseNews cascades.
 
-    Parameters
-    ----------
-    csv_path : path to raw_data_anon.csv
-    target_size : truncate cascades to this many nodes via BFS from root
-    min_size : minimum reachable-from-root size to include
-    veracity : filter to ``"TRUE"``, ``"FALSE"``, or ``"MIXED"`` (None = all)
-
-    Returns
-    -------
-    cascades : list[CascadeResult]
-    metadata : list[dict]
-        Per-cascade info: cascade_id, veracity, rumor_category, original_size.
+    Returns (cascades, metadata) where metadata tracks veracity etc.
+    for per-class analysis later. Could expand veracity filter to split
+    TRUE vs FALSE vs MIXED runs.
     """
     print(f"Loading FalseNews data from {csv_path} ...")
     df = pd.read_csv(csv_path)
@@ -77,6 +63,7 @@ def load_falsenews_cascades(
         if idx % 5000 == 0 and idx > 0:
             print(f"  Processed {idx}/{total_groups} cascade groups ...")
 
+        # root = tweet with parent_tid == -1
         roots = group[group["parent_tid"] == -1]
         if len(roots) == 0:
             skipped_no_root += 1
@@ -85,7 +72,7 @@ def load_falsenews_cascades(
         root_row = roots.iloc[0]
         root_tid = int(root_row["tid"])
 
-        # Build directed tree: parent -> child
+        # retweet tree: parent -> child edges
         tree = nx.DiGraph()
         all_tids = set(int(t) for t in group["tid"].values)
         tree.add_nodes_from(all_tids)
@@ -93,16 +80,16 @@ def load_falsenews_cascades(
         for _, row in group.iterrows():
             parent = int(row["parent_tid"])
             child = int(row["tid"])
+            # only add edge if parent is actually in this cascade
             if parent != -1 and parent in all_tids:
                 tree.add_edge(parent, child)
 
-        # BFS from root — only keep reachable nodes
+        # only keep nodes reachable from root
         reachable = _bfs_truncate(tree, root_tid, target_size=len(all_tids))
         if len(reachable) < min_size:
             skipped_too_small += 1
             continue
 
-        # Truncate to target_size
         truncated = reachable[:target_size]
         truncated_set = set(truncated)
 
@@ -111,7 +98,7 @@ def load_falsenews_cascades(
             if u in truncated_set and v in truncated_set
         ]
 
-        # Infection times = BFS depth from root (analogous to IC timesteps)
+        # use BFS depth as infection time (analogous to IC timesteps)
         sub = tree.subgraph(truncated_set)
         depths = nx.single_source_shortest_path_length(sub, root_tid)
         infection_times = {node: depths.get(node, 0) for node in truncated}
