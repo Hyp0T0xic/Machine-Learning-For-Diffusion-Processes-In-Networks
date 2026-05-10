@@ -12,7 +12,8 @@ import random
 from collections import defaultdict
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_REPO_ROOT))
 
 import matplotlib
 matplotlib.use("Agg")
@@ -28,10 +29,10 @@ from src.evaluation.metrics import evaluate_ranker
 
 TARGET_SIZE = 25
 MODEL_PATHS = {
-    "RF (IC-BA)": Path("results/models/ic_ba/rf_model_size25.pkl"),
-    "RF (IC-ER)": Path("results/models/ic_er/rf_model_size25.pkl"),
+    "RF (IC-BA)": _REPO_ROOT / "results/models/ic_ba/rf_model_size25.pkl",
+    "RF (IC-ER)": _REPO_ROOT / "results/models/ic_er/rf_model_size25.pkl",
 }
-OUT_DIR = Path("validation/results/figures")
+OUT_DIR = _REPO_ROOT / "validation/results/figures"
 
 METHOD_LABELS = {
     "RF (IC-BA)":  "RF (trained IC-BA)",

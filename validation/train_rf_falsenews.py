@@ -12,7 +12,8 @@ import random
 from collections import defaultdict
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_REPO_ROOT))
 
 import matplotlib
 matplotlib.use("Agg")
@@ -31,13 +32,13 @@ from src.evaluation.metrics import evaluate_ranker
 
 TARGET_SIZE   = 25
 SEEDS         = [42, 123, 456, 789, 1024]
-OUT_DIR       = Path("validation/results/figures")
-MODEL_DIR     = Path("validation/results/models")
+OUT_DIR       = _REPO_ROOT / "validation/results/figures"
+MODEL_DIR     = _REPO_ROOT / "validation/results/models"
 
 # these never saw FalseNews data so no leakage concern
 EXISTING_MODELS = {
-    "RF (IC-BA)": Path("results/models/ic_ba/rf_model_size25.pkl"),
-    "RF (IC-ER)": Path("results/models/ic_er/rf_model_size25.pkl"),
+    "RF (IC-BA)": _REPO_ROOT / "results/models/ic_ba/rf_model_size25.pkl",
+    "RF (IC-ER)": _REPO_ROOT / "results/models/ic_er/rf_model_size25.pkl",
 }
 
 METHOD_LABELS = {
@@ -250,7 +251,7 @@ def main() -> None:
     cascades, metadata = load_falsenews_cascades(target_size=TARGET_SIZE)
     print(f"\nTraining on {len(cascades)} FalseNews cascades\n")
 
-    # build once — data is fixed, only the split changes per seed
+    # build once - data is fixed so only the split changes per seed
     X, y, index, feature_names = build_feature_matrix(cascades)
     groups = [idx[0] for idx in index]
 
