@@ -228,3 +228,5 @@ scripts/experiments/run_ablation_studies.bat
 .claude/
 FalseNews_Code_Data/
 falsenews_experiments/
+data/outbreak_trees/
+data/rumdect/

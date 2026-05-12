@@ -74,10 +74,10 @@ def plot(stats: pd.DataFrame, out_dir: Path) -> None:
 
     # different gray shades to distinguish veracity groups in b&w
     plot_order = [
-        ("ALL",   "#cecece"),
-        ("TRUE",  "#59a89c"),
-        ("FALSE", "#e02b35"),
-        ("MIXED", "#f0c571"),
+        ("ALL",   "#A3A1D8"),
+        ("TRUE",  "#4DB6AC"),
+        ("FALSE", "#D99685"),
+        ("MIXED", "#C0A064"),
     ]
 
     for ax, (label, color) in zip(axes.flat, plot_order):

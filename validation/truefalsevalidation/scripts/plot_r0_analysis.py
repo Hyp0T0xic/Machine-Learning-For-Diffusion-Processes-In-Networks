@@ -21,7 +21,10 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 DATA_DIR   = _REPO_ROOT / "validation/truefalsevalidation/data"
 OUT_DIR    = _REPO_ROOT / "validation/truefalsevalidation/figures"
 
-COLORS = ["#082a54", "#a559aa", "#59a89c", "#f0c571", "#e02b35", "#cecece"]
+COLORS = [
+    "#D99685", "#E38EA0", "#4DB6AC", "#9CB067", "#C0A064",
+    "#7FB382", "#A3A1D8", "#DA92B7", "#C594D1", "#56B4BE",
+]
 
 R0_BINS = [(0.0, 0.75), (0.75, 1.5), (1.5, 2.5), (2.5, 4.0), (4.0, float("inf"))]
 
