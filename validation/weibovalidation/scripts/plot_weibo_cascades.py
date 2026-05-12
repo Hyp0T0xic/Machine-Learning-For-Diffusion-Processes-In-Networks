@@ -8,7 +8,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-from scripts.experiments.validate_weibo import load_weibo_cascades
+from validation.weibovalidation.scripts.validate_weibo import load_weibo_cascades
 from src.visualization.cascades import plot_cascade_tree
 
 N_EXAMPLES = 5
@@ -60,7 +60,7 @@ def main() -> None:
     )
     plt.tight_layout()
 
-    out_path = Path("results/figures/cascades/examples_weibo.png")
+    out_path = Path(__file__).resolve().parent.parent / "figures" / "examples_weibo.png"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=150, facecolor=fig.get_facecolor(), bbox_inches="tight")
     plt.close(fig)

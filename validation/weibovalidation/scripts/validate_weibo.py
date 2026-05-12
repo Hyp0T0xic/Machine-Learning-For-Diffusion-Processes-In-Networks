@@ -30,10 +30,10 @@ from src.data.cascade import CascadeResult
 from src.baselines.centrality import jordan_center, degree_rank
 
 # ── Config ──────────────────────────────────────────────────────────────────
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 WEIBO_DIR = PROJECT_ROOT / "rumdect" / "Weibo"
 MODELS_DIR = PROJECT_ROOT / "results" / "models"
-FIG_DIR = PROJECT_ROOT / "results" / "figures" / "ml_evaluation"
+FIG_DIR = PROJECT_ROOT / "validation" / "weibovalidation" / "figures"
 FIG_DIR.mkdir(parents=True, exist_ok=True)
 
 # Cascade size filter: test on medium-large cascades
@@ -152,6 +152,8 @@ def load_weibo_cascades(max_count: int = MAX_CASCADES) -> list[CascadeResult]:
 
 # ── Evaluation ──────────────────────────────────────────────────────────────
 
+SEEDS = [42, 123, 456, 789, 1024]
+
 def evaluate_method(cascades: list[CascadeResult], rank_fn, name: str) -> dict:
     """Evaluate a ranking method on all cascades."""
     top1_correct = 0
@@ -181,6 +183,41 @@ def evaluate_method(cascades: list[CascadeResult], rank_fn, name: str) -> dict:
     return {"name": name, "top1": top1_acc, "top3": top3_acc, "total": total}
 
 
+def _run_seed(cascades, models, seed):
+    """Run one evaluation pass with a specific random seed."""
+    random.seed(seed)
+    np.random.seed(seed)
+
+    results = {}
+
+    # Baselines (affected by random tie-breaking)
+    results["Jordan Center"] = evaluate_method(cascades, jordan_center, "Jordan Center")
+    results["Degree"] = evaluate_method(cascades, degree_rank, "Degree")
+
+    # RF Models (deterministic, but include for consistency)
+    for name, model in models.items():
+        results[name] = evaluate_method(cascades, model.rank_nodes, name)
+
+    return results
+
+
+def _aggregate_seeds(all_seed_results):
+    """Average top-1 / top-3 across seeds per method."""
+    avg = {}
+    for method in METHOD_ORDER:
+        t1_vals = [sr[method]["top1"] for sr in all_seed_results if method in sr]
+        t3_vals = [sr[method]["top3"] for sr in all_seed_results if method in sr]
+        if t1_vals:
+            avg[method] = {
+                "top1": np.mean(t1_vals),
+                "top3": np.mean(t3_vals),
+                "top1_std": np.std(t1_vals),
+                "top3_std": np.std(t3_vals),
+                "total": all_seed_results[0][method]["total"],
+            }
+    return avg
+
+
 # ── Plotting (matches train_rf_ic_ba.py style) ─────────────────────────────
 
 METHOD_LABELS = {
@@ -203,35 +240,34 @@ PALETTE = {
 }
 
 
-def _plot_accuracy(results: list[dict]) -> Path:
-    """Plot grouped bars matching the train_rf_ic_ba.py style."""
+def _plot_accuracy(avg_metrics: dict) -> Path:
+    """Plot grouped bars with error bars, matching the FalseNews style."""
     fig, axes = plt.subplots(2, 1, figsize=(12, 10))
     fig.patch.set_facecolor("#0d0d1a")
 
-    # Build lookup: method_name -> result dict
-    results_map = {r["name"]: r for r in results}
-
-    # We have a single "group" (Weibo) but plot each method as a bar
-    methods = [m for m in METHOD_ORDER if m in results_map]
+    methods = [m for m in METHOD_ORDER if m in avg_metrics]
     x = np.arange(len(methods))
     bar_w = 0.6
 
-    for ax, k_measure, title in zip(axes, ["top1", "top3"],
-            ["Top-1 Accuracy — Weibo Real-World Validation",
-             "Top-3 Accuracy — Weibo Real-World Validation"]):
+    for ax, k_measure, k_std, title in zip(axes,
+            ["top1", "top3"], ["top1_std", "top3_std"],
+            [f"Top-1 Accuracy — Weibo Real-World Validation (mean over {len(SEEDS)} seeds)",
+             f"Top-3 Accuracy — Weibo Real-World Validation (mean over {len(SEEDS)} seeds)"]):
         ax.set_facecolor("#1a1a2e")
 
-        vals = [results_map[m][k_measure] for m in methods]
+        vals = [avg_metrics[m][k_measure] for m in methods]
+        errs = [avg_metrics[m][k_std] for m in methods]
         colors = [PALETTE.get(m, "#888888") for m in methods]
         labels = [METHOD_LABELS.get(m, m) for m in methods]
 
-        bars = ax.bar(x, vals, bar_w,
-                      color=colors, edgecolor="black", linewidth=0.5)
+        bars = ax.bar(x, vals, bar_w, yerr=errs,
+                      color=colors, edgecolor="black", linewidth=0.5,
+                      capsize=4, error_kw={"ecolor": "white", "alpha": 0.6})
 
         # Value labels on top of bars
-        for bar_obj, val in zip(bars, vals):
-            ax.text(bar_obj.get_x() + bar_obj.get_width() / 2, bar_obj.get_height() + 1,
-                    f"{val:.1f}%", ha="center", va="bottom",
+        for bar_obj, val, err in zip(bars, vals, errs):
+            ax.text(bar_obj.get_x() + bar_obj.get_width() / 2, bar_obj.get_height() + err + 1,
+                    f"{val:.1f}±{err:.1f}%", ha="center", va="bottom",
                     color="white", fontsize=10, fontweight="bold")
 
         ax.set_xticks(x)
@@ -255,14 +291,11 @@ def _plot_accuracy(results: list[dict]) -> Path:
 # ── Main ────────────────────────────────────────────────────────────────────
 
 def main():
-    random.seed(42)
-    np.random.seed(42)
-
     print("=" * 60)
     print("WEIBO REAL-WORLD VALIDATION")
     print("=" * 60)
 
-    # 1. Load cascades
+    # 1. Load cascades (once — data is fixed)
     print("\n[1/3] Loading Weibo cascades...")
     cascades = load_weibo_cascades()
 
@@ -281,34 +314,33 @@ def main():
         else:
             print(f"  MISSING: {path}")
 
-    # 3. Evaluate
-    print("\n[3/3] Evaluating on Weibo cascades...")
-    results = []
+    # 3. Evaluate across seeds
+    print(f"\n[3/3] Evaluating on Weibo cascades ({len(SEEDS)} seeds)...")
+    all_seed_results = []
 
-    # Baselines
-    print("  Evaluating Jordan Center...")
-    results.append(evaluate_method(cascades, jordan_center, "Jordan Center"))
+    for i, seed in enumerate(SEEDS):
+        print(f"\n  -- SEED {i+1}/{len(SEEDS)}: {seed} --")
+        seed_results = _run_seed(cascades, models, seed)
+        all_seed_results.append(seed_results)
 
-    print("  Evaluating Degree...")
-    results.append(evaluate_method(cascades, degree_rank, "Degree"))
+    # 4. Aggregate and print
+    avg_metrics = _aggregate_seeds(all_seed_results)
 
-    # RF Models
-    for name, model in models.items():
-        print(f"  Evaluating {name}...")
-        results.append(evaluate_method(cascades, model.rank_nodes, name))
-
-    # 4. Print results
     print("\n" + "=" * 60)
-    print("RESULTS: Weibo Real-World Validation")
+    print(f"RESULTS: Weibo Real-World Validation (mean ± std over {len(SEEDS)} seeds)")
     print("=" * 60)
-    print(f"{'Method':<20} | {'Top-1 Acc':>10} | {'Top-3 Acc':>10} | {'N':>6}")
-    print("-" * 55)
-    for r in results:
-        print(f"{r['name']:<20} | {r['top1']:>9.1f}% | {r['top3']:>9.1f}% | {r['total']:>6}")
+    print(f"{'Method':<20} | {'Top-1 Acc':>14} | {'Top-3 Acc':>14} | {'N':>6}")
+    print("-" * 65)
+    for m in METHOD_ORDER:
+        if m in avg_metrics:
+            a = avg_metrics[m]
+            print(f"{m:<20} | {a['top1']:>5.1f}±{a['top1_std']:>4.1f}% "
+                  f"| {a['top3']:>5.1f}±{a['top3_std']:>4.1f}% | {a['total']:>6}")
 
-    # 5. Plot (matching train_rf_ic_ba.py style)
-    _plot_accuracy(results)
+    # 5. Plot
+    _plot_accuracy(avg_metrics)
 
 
 if __name__ == "__main__":
     main()
+

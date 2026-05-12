@@ -7,6 +7,7 @@ from pathlib import Path
 import json
 import csv
 import collections
+import random
 from typing import Callable
 
 import joblib
@@ -20,10 +21,10 @@ from src.data.cascade import CascadeResult
 from src.baselines.centrality import jordan_center, degree_rank
 
 # ── Config ──────────────────────────────────────────────────────────────────
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 TREES_DIR = PROJECT_ROOT / "data" / "outbreak_trees" / "csv_exports"
 MODELS_DIR = PROJECT_ROOT / "results" / "models"
-FIG_DIR = PROJECT_ROOT / "results" / "figures" / "ml_evaluation"
+FIG_DIR = PROJECT_ROOT / "validation" / "outbreaksvalidation" / "figures"
 FIG_DIR.mkdir(parents=True, exist_ok=True)
 
 # Cascade size filter
@@ -150,70 +151,106 @@ PALETTE = {
 
 # ── Evaluation logic ────────────────────────────────────────────────────────
 
-def evaluate_method(cascades: list[CascadeResult],
-                    rank_fn: Callable[[CascadeResult], list[int]],
-                    name: str) -> tuple[float, float]:
-    """Return (top_1_acc, top_3_acc)."""
-    top1, top3 = 0, 0
+SEEDS = [42, 123, 456, 789, 1024]
+
+def evaluate_method(cascades: list[CascadeResult], rank_fn, name: str) -> dict:
+    """Evaluate a ranking method on all cascades."""
+    top1_correct = 0
+    top3_correct = 0
     total = 0
 
     for i, cascade in enumerate(cascades):
-        ranked = rank_fn(cascade)
-            
+        try:
+            ranked = rank_fn(cascade)
+        except Exception:
+            continue
+
         if not ranked:
             continue
-            
-        true_src = cascade.source
-        
-        if name == "Jordan Center" and i < 3:
-            print(f"      [DEBUG] True source: {true_src}, Top ranked: {ranked[:5]}")
-            
-        if ranked[0] == true_src:
-            top1 += 1
-        if true_src in ranked[:3]:
-            top3 += 1
+
+        source = cascade.source
         total += 1
+        if ranked[0] == source:
+            top1_correct += 1
+        if source in ranked[:3]:
+            top3_correct += 1
 
-    if total == 0:
-        return 0.0, 0.0
-    return (top1 / total), (top3 / total)
+    top1_acc = (top1_correct / total * 100) if total > 0 else 0
+    top3_acc = (top3_correct / total * 100) if total > 0 else 0
+    return {"name": name, "top1": top1_acc, "top3": top3_acc, "total": total}
 
 
-def plot_results(metrics: dict[str, dict[str, float]]) -> None:
-    plt.style.use("dark_background")
-    fig, axes = plt.subplots(1, 2, figsize=(10, 5))
-    fig.patch.set_facecolor("#0d0d1a")
-    for ax in axes:
-        ax.set_facecolor("#0d0d1a")
+def _run_seed(cascades, models, seed):
+    """Run one evaluation pass with a specific random seed."""
+    random.seed(seed)
+    np.random.seed(seed)
 
-    top1_vals = [metrics[m]["top1"] * 100 for m in METHOD_ORDER]
-    top3_vals = [metrics[m]["top3"] * 100 for m in METHOD_ORDER]
-    colors = [PALETTE[m] for m in METHOD_ORDER]
-    x_pos = np.arange(len(METHOD_ORDER))
-    
-    # Panel A: Top-1
-    axes[0].bar(x_pos, top1_vals, color=colors, width=0.6, zorder=3)
-    axes[0].set_title("Top-1 Accuracy", color="white", pad=15)
-    axes[0].set_ylabel("Accuracy (%)", color="white")
-    axes[0].set_ylim(0, 105)
-    
-    # Panel B: Top-3
-    axes[1].bar(x_pos, top3_vals, color=colors, width=0.6, zorder=3)
-    axes[1].set_title("Top-3 Accuracy", color="white", pad=15)
-    axes[1].set_ylim(0, 105)
+    results = {}
 
-    for ax in axes:
-        ax.set_xticks(x_pos)
-        ax.set_xticklabels([METHOD_LABELS[m] for m in METHOD_ORDER],
-                           rotation=45, ha="right", color="white")
-        ax.grid(True, axis="y", color="#333344", linestyle="--", alpha=0.5, zorder=0)
-        ax.tick_params(axis="y", colors="white")
-        for sp in ax.spines.values():
-            sp.set_color("#444")
+    # Baselines (affected by random tie-breaking)
+    results["Jordan Center"] = evaluate_method(cascades, jordan_center, "Jordan Center")
+    results["Degree"] = evaluate_method(cascades, degree_rank, "Degree")
+
+    # RF Models (deterministic, but include for consistency)
+    for name, model in models.items():
+        results[name] = evaluate_method(cascades, model.rank_nodes, name)
+
+    return results
+
+
+def _aggregate_seeds(all_seed_results):
+    """Average top-1 / top-3 across seeds per method."""
+    avg = {}
+    for method in METHOD_ORDER:
+        t1_vals = [sr[method]["top1"] for sr in all_seed_results if method in sr]
+        t3_vals = [sr[method]["top3"] for sr in all_seed_results if method in sr]
+        if t1_vals:
+            avg[method] = {
+                "top1": np.mean(t1_vals),
+                "top3": np.mean(t3_vals),
+                "top1_std": np.std(t1_vals),
+                "top3_std": np.std(t3_vals),
+                "total": all_seed_results[0][method]["total"],
+            }
+    return avg
+
+
+COLORS = ["#082a54", "#a559aa", "#59a89c", "#f0c571", "#e02b35", "#cecece"]
+
+
+def plot_results(avg_metrics: dict) -> None:
+    methods = [m for m in METHOD_ORDER if m in avg_metrics]
+    x = np.arange(len(methods))
+
+    n_cascades = avg_metrics[methods[0]]["total"] if methods else 0
+
+    plt.style.use("default")
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+
+    for ax, key, title in zip(axes, ["top1", "top3"], [
+        f"top-1 accuracy -- OutbreakTrees biological validation ($n={n_cascades}$)",
+        f"top-3 accuracy -- OutbreakTrees biological validation ($n={n_cascades}$)",
+    ]):
+        vals = [avg_metrics[m][key] for m in methods]
+        stds = [avg_metrics[m][key + "_std"] for m in methods]
+        for xi, (val, std) in enumerate(zip(vals, stds)):
+            ax.bar(xi, val, facecolor=COLORS[xi % len(COLORS)],
+                   edgecolor="black", linewidth=0.5)
+            lbl = f"{val:.1f}±{std:.1f}%" if std > 0.05 else f"{val:.1f}%"
+            ax.text(xi, val + 1.5, lbl, ha="center", va="bottom", fontsize=8)
+        ax.set_xticks(x)
+        ax.set_xticklabels(
+            [METHOD_LABELS.get(m, m) for m in methods],
+            rotation=30, ha="right", fontsize=9,
+        )
+        k = 1 if key == "top1" else 3
+        ax.set_ylabel(f"top-{k} accuracy (%)")
+        ax.set_title(title, fontsize=10)
+        ax.set_ylim(0, 112)
 
     plt.tight_layout()
     out_file = FIG_DIR / "outbreak_trees_validation.png"
-    fig.savefig(out_file, dpi=150, facecolor=fig.get_facecolor(), bbox_inches="tight")
+    fig.savefig(out_file, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"\nSaved accuracy plot -> {out_file}")
 
@@ -245,39 +282,30 @@ def main() -> None:
         else:
             print(f"  [!] Missing model: {p}")
 
-    # 3. Evaluate
-    print("\n[3/3] Evaluating on biological cascades...")
-    metrics = {}
-    
-    print("  Evaluating Jordan Center...")
-    t1, t3 = evaluate_method(cascades, jordan_center, "Jordan Center")
-    metrics["Jordan Center"] = {"top1": t1, "top3": t3}
+    # 3. Evaluate across seeds
+    print(f"\n[3/3] Evaluating on biological cascades ({len(SEEDS)} seeds)...")
+    all_seed_results = []
 
-    print("  Evaluating Degree...")
-    t1, t3 = evaluate_method(cascades, degree_rank, "Degree")
-    metrics["Degree"] = {"top1": t1, "top3": t3}
+    for i, seed in enumerate(SEEDS):
+        print(f"\n  -- SEED {i+1}/{len(SEEDS)}: {seed} --")
+        seed_results = _run_seed(cascades, models, seed)
+        all_seed_results.append(seed_results)
 
-    for name in ["RF (IC-BA)", "RF (IC-ER)"]:
-        if name in models:
-            print(f"  Evaluating {name}...")
-            clf = models[name]
-            t1, t3 = evaluate_method(cascades, lambda c, m=clf: m.rank_nodes(c), name)
-            metrics[name] = {"top1": t1, "top3": t3}
-        else:
-            metrics[name] = {"top1": 0.0, "top3": 0.0}
+    # 4. Aggregate and print
+    avg_metrics = _aggregate_seeds(all_seed_results)
 
-    # Print table
     print("\n" + "=" * 60)
-    print("RESULTS: OutbreakTrees Biological Validation")
+    print(f"RESULTS: OutbreakTrees Biological Validation (mean ± std over {len(SEEDS)} seeds)")
     print("=" * 60)
-    print(f"{'Method':<20} | {'Top-1 Acc':>10} | {'Top-3 Acc':>10} | {'N':>6}")
-    print("-" * 55)
+    print(f"{'Method':<20} | {'Top-1 Acc':>14} | {'Top-3 Acc':>14} | {'N':>6}")
+    print("-" * 65)
     for m in METHOD_ORDER:
-        t1 = metrics[m]["top1"] * 100
-        t3 = metrics[m]["top3"] * 100
-        print(f"{m:<20} | {t1:>9.1f}% | {t3:>9.1f}% | {len(cascades):>6}")
+        if m in avg_metrics:
+            a = avg_metrics[m]
+            print(f"{m:<20} | {a['top1']:>5.1f}±{a['top1_std']:>4.1f}% "
+                  f"| {a['top3']:>5.1f}±{a['top3_std']:>4.1f}% | {a['total']:>6}")
 
-    plot_results(metrics)
+    plot_results(avg_metrics)
 
 
 if __name__ == "__main__":
