@@ -22,7 +22,7 @@ import random
 from collections import defaultdict
 from pathlib import Path
 
-_REPO_ROOT = Path(__file__).resolve().parent.parent
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_REPO_ROOT))
 
 import matplotlib
@@ -31,7 +31,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.model_selection import StratifiedGroupKFold
 
-from validation.load_falsenews import load_falsenews_cascades
+from validation.truefalsevalidation.load_falsenews import load_falsenews_cascades
 from src.features.extract import build_feature_matrix
 from src.models.random_forest import SourceRandomForest
 from src.baselines.centrality import predict_all
@@ -54,7 +54,7 @@ CSV_PATH = (
 
 # R0 bins mirroring simulated values 0.5, 1, 2, 3, 5
 R0_BINS   = [(0.0, 0.75), (0.75, 1.5), (1.5, 2.5), (2.5, 4.0), (4.0, float("inf"))]
-R0_LABELS = ["R0 ≈ 0.5", "R0 ≈ 1", "R0 ≈ 2", "R0 ≈ 3", "R0 ≈ 5"]
+R0_LABELS = ["R0~0.5", "R0~1", "R0~2", "R0~3", "R0~5"]
 
 METHOD_LABELS = {
     "rf_falsenews": "RF (FalseNews)",
@@ -66,13 +66,13 @@ METHOD_LABELS = {
 }
 METHOD_ORDER = list(METHOD_LABELS.keys())
 
-PALETTE = {
-    "rf_falsenews": "#06d6a0",
-    "jordan":       "#e63946",
-    "closeness":    "#f4a261",
-    "betweenness":  "#2ec4b6",
-    "degree":       "#a8dadc",
-    "random":       "#888888",
+HATCHES = {
+    "rf_falsenews": "",
+    "jordan":       "////",
+    "closeness":    "\\\\\\\\",
+    "betweenness":  "xxxx",
+    "degree":       "----",
+    "random":       "....",
 }
 
 
@@ -200,67 +200,53 @@ def _print_results(avg_metrics, bin_counts):
 # -- Plots -------------------------------------------------------------------
 
 def _plot_r0_distribution(r0_values, out_dir):
-    fig, ax = plt.subplots(figsize=(10, 5))
-    fig.patch.set_facecolor("#0d0d1a")
-    ax.set_facecolor("#1a1a2e")
+    plt.style.use("default")
+    fig, ax = plt.subplots(figsize=(9, 5))
 
-    ax.hist(r0_values, bins=40, color="#06d6a0", edgecolor="black", linewidth=0.5)
+    ax.hist(r0_values, bins=40, facecolor="0.7", edgecolor="black", linewidth=0.5)
 
-    # overlay bin boundaries
     for (lo, _), label in zip(R0_BINS[1:], R0_LABELS[1:]):
-        ax.axvline(lo, color="#ffb703", linewidth=1.2, linestyle="--", alpha=0.7)
+        ax.axvline(lo, color="black", linewidth=1.2, linestyle="--", alpha=0.6)
 
-    ax.set_xlabel("Estimated R0 (mean secondary infections per spreading node)",
-                  color="lightgray")
-    ax.set_ylabel("Number of cascades", color="lightgray")
-    ax.set_title(
-        f"R0 Distribution — FalseNews Cascades (n={len(r0_values)}, size={TARGET_SIZE})",
-        color="white", fontweight="bold",
-    )
-    ax.tick_params(colors="lightgray")
-    for sp in ax.spines.values():
-        sp.set_edgecolor("#444")
+    ax.set_xlabel("estimated $R_0$ (mean secondary infections per spreading node)")
+    ax.set_ylabel("number of cascades")
+    ax.set_title(f"$R_0$ distribution — FalseNews cascades ($n={len(r0_values)}$, size={TARGET_SIZE})")
 
     # annotate bins
     x_prev = 0
     for (lo, hi), label in zip(R0_BINS, R0_LABELS):
         x_mid = (x_prev + min(hi, max(r0_values))) / 2
         count = sum(1 for r in r0_values if lo <= r < hi)
-        ax.text(x_mid, ax.get_ylim()[1] * 0.92, f"{label}\nn={count}",
-                ha="center", va="top", color="lightgray", fontsize=8)
+        ax.text(x_mid, ax.get_ylim()[1] * 0.92, f"{label}\n$n={count}$",
+                ha="center", va="top", fontsize=8)
         x_prev = lo
 
     plt.tight_layout()
     out_file = out_dir / "r0_distribution_falsenews.png"
-    fig.savefig(out_file, dpi=150, facecolor=fig.get_facecolor(), bbox_inches="tight")
+    fig.savefig(out_file, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved R0 distribution plot -> {out_file}")
     return out_file
 
 
 def _plot_accuracy_by_r0(avg_metrics, out_dir):
-    # only include bins that have data for at least one method
     active_labels = [lbl for lbl in R0_LABELS if avg_metrics.get(lbl)]
     if not active_labels:
         print("No data to plot.")
         return None
 
-    fig, axes = plt.subplots(2, 1, figsize=(12, 10))
-    fig.patch.set_facecolor("#0d0d1a")
+    plt.style.use("default")
+    fig, axes = plt.subplots(2, 1, figsize=(11, 9))
 
-    x      = np.arange(len(active_labels))
-    bar_w  = 0.12
-    n_m    = len(METHOD_ORDER)
+    x       = np.arange(len(active_labels))
+    bar_w   = 0.12
+    n_m     = len(METHOD_ORDER)
     offsets = np.linspace(-(n_m - 1) / 2 * bar_w, (n_m - 1) / 2 * bar_w, n_m)
 
     for ax, k_measure, title in zip(axes, [1, 3], [
-        f"Top-1 Accuracy — FalseNews by Estimated R0 "
-        f"(mean over {len(SEEDS)} seeds, size={TARGET_SIZE})",
-        f"Top-3 Accuracy — FalseNews by Estimated R0 "
-        f"(mean over {len(SEEDS)} seeds, size={TARGET_SIZE})",
+        f"top-1 accuracy — FalseNews by estimated $R_0$ (mean over {len(SEEDS)} seeds)",
+        f"top-3 accuracy — FalseNews by estimated $R_0$ (mean over {len(SEEDS)} seeds)",
     ]):
-        ax.set_facecolor("#1a1a2e")
-
         for i, method in enumerate(METHOD_ORDER):
             vals, errs = [], []
             for label in active_labels:
@@ -276,30 +262,24 @@ def _plot_accuracy_by_r0(avg_metrics, out_dir):
                 x + offsets[i], vals, bar_w,
                 yerr=errs,
                 label=METHOD_LABELS[method],
-                color=PALETTE[method],
+                facecolor="white",
+                hatch=HATCHES.get(method, ""),
                 edgecolor="black", linewidth=0.5,
                 capsize=2,
-                error_kw={"ecolor": "white", "alpha": 0.6},
+                error_kw={"ecolor": "black", "alpha": 0.7},
             )
 
         ax.set_xticks(x)
-        ax.set_xticklabels(active_labels, color="lightgray")
-        ax.set_ylabel(f"Top-{k_measure} Accuracy (%)", color="lightgray")
-        ax.set_title(title, color="white", fontweight="bold")
+        ax.set_xticklabels(active_labels)
+        ax.set_ylabel(f"top-{k_measure} accuracy (%)")
+        ax.set_title(title)
         ax.set_ylim(0, 105)
-        ax.tick_params(colors="lightgray")
         if k_measure == 1:
-            ax.legend(
-                fontsize=9, facecolor="#222", edgecolor="#444",
-                labelcolor="white", loc="upper left",
-                bbox_to_anchor=(1.02, 1),
-            )
-        for sp in ax.spines.values():
-            sp.set_edgecolor("#444")
+            ax.legend(fontsize=9, frameon=True, loc="upper left", bbox_to_anchor=(1.02, 1))
 
     plt.tight_layout()
     out_file = out_dir / "r0_vs_accuracy_falsenews.png"
-    fig.savefig(out_file, dpi=150, facecolor=fig.get_facecolor(), bbox_inches="tight")
+    fig.savefig(out_file, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved accuracy-by-R0 plot -> {out_file}")
     return out_file

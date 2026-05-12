@@ -16,7 +16,7 @@ import pandas as pd
 from src.data.cascade import CascadeResult
 
 
-_REPO_ROOT = Path(__file__).resolve().parent.parent
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
 def _default_csv_path() -> Path:

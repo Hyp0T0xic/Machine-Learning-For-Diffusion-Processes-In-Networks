@@ -34,7 +34,7 @@ SIZE_RANGE = range(15, 41)          # integer thresholds, 15 to 40 inclusive
 N_REPS     = 15       # more reps = more pooled probes = more stable at high sizes
 MIN_HITS   = 50
 MAX_PROBES = 1_000_000              # need a big cap since size=30 at r0=0.5 is very rare
-Y_CAP      = None  # set dynamically from data after estimation
+Y_CAP      = 500_000_000
 
 OUT_DIR = Path("results/figures/ml_evaluation")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -109,10 +109,6 @@ def main():
     ba_std = np.array(ba_std)
     er_est = np.array(er_est)
     er_std = np.array(er_std)
-
-    # set cap from largest finite value, rounded up to a clean number
-    all_finite = np.concatenate([ba_est[np.isfinite(ba_est)], er_est[np.isfinite(er_est)]])
-    Y_CAP = float(np.max(all_finite)) * 1.05  # 5% headroom above the largest value
 
     ba_clipped     = np.clip(ba_est, 0, Y_CAP)
     er_clipped     = np.clip(er_est, 0, Y_CAP)

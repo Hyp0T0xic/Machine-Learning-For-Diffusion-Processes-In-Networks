@@ -12,7 +12,7 @@ import random
 from collections import defaultdict
 from pathlib import Path
 
-_REPO_ROOT = Path(__file__).resolve().parent.parent
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_REPO_ROOT))
 
 import matplotlib
@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import joblib
 
-from validation.load_falsenews import load_falsenews_cascades
+from validation.truefalsevalidation.load_falsenews import load_falsenews_cascades
 from src.baselines.centrality import predict_all
 from src.evaluation.metrics import evaluate_ranker
 
@@ -113,47 +113,44 @@ def main() -> None:
     _plot_accuracy(metrics, len(cascades))
 
 
-def _plot_accuracy(metrics: dict, n_cascades: int) -> None:
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
-    fig.patch.set_facecolor("#0d0d1a")
+HATCHES = {
+    "RF (IC-BA)":  "",
+    "RF (IC-ER)":  "////",
+    "jordan":      "\\\\\\\\",
+    "closeness":   "xxxx",
+    "betweenness": "----",
+    "degree":      "||||",
+    "random":      "....",
+}
 
-    palette = {
-        "RF (IC-BA)":  "#ffb703",
-        "RF (IC-ER)":  "#e76f51",
-        "jordan":      "#e63946",
-        "closeness":   "#f4a261",
-        "betweenness": "#2ec4b6",
-        "degree":      "#a8dadc",
-        "random":      "#888888",
-    }
+
+def _plot_accuracy(metrics: dict, n_cascades: int) -> None:
+    plt.style.use("default")
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
 
     methods_present = [m for m in METHOD_ORDER if m in metrics]
     x = np.arange(len(methods_present))
 
     for ax, k, title in zip(axes, [1, 3], [
-        f"Top-1 Accuracy — Existing Models on FalseNews (n={n_cascades})",
-        f"Top-3 Accuracy — Existing Models on FalseNews (n={n_cascades})",
+        f"top-1 accuracy — existing models on FalseNews ($n={n_cascades}$)",
+        f"top-3 accuracy — existing models on FalseNews ($n={n_cascades}$)",
     ]):
-        ax.set_facecolor("#1a1a2e")
         vals = [100 * metrics[m]["top_k"][k] for m in methods_present]
-        colors = [palette.get(m, "#888888") for m in methods_present]
-        ax.bar(x, vals, color=colors, edgecolor="black", linewidth=0.5)
+        for xi, (val, method) in enumerate(zip(vals, methods_present)):
+            ax.bar(xi, val, facecolor="white", hatch=HATCHES.get(method, ""),
+                   edgecolor="black", linewidth=0.5)
         ax.set_xticks(x)
         ax.set_xticklabels(
             [METHOD_LABELS[m] for m in methods_present],
-            color="lightgray", rotation=30, ha="right", fontsize=9,
+            rotation=30, ha="right", fontsize=9,
         )
-        ax.set_ylabel(f"Top-{k} Accuracy (%)", color="lightgray")
-        ax.set_title(title, color="white", fontweight="bold", fontsize=10)
+        ax.set_ylabel(f"top-{k} accuracy (%)")
+        ax.set_title(title, fontsize=10)
         ax.set_ylim(0, 105)
-        ax.tick_params(colors="lightgray")
-        for sp in ax.spines.values():
-            sp.set_edgecolor("#444")
 
     plt.tight_layout()
     out_file = OUT_DIR / "existing_models_on_falsenews.png"
-    fig.savefig(out_file, dpi=150, facecolor=fig.get_facecolor(),
-                bbox_inches="tight")
+    fig.savefig(out_file, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"\nSaved plot -> {out_file}")
 

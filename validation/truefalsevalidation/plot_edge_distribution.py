@@ -14,7 +14,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-_REPO_ROOT = Path(__file__).resolve().parent.parent
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_REPO_ROOT))
 
 import matplotlib
@@ -65,58 +65,41 @@ def load_edge_counts() -> pd.DataFrame:
 
 
 def plot(stats: pd.DataFrame, out_dir: Path) -> None:
-    veracity_colors = {
-        "TRUE":  "#06d6a0",
-        "FALSE": "#e63946",
-        "MIXED": "#ffb703",
-    }
-
-    # shared bin edges across all groups
+    plt.style.use("default")
     max_edges = stats["n_edges"].max()
     bins = np.linspace(0, max_edges, 60)
 
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-    fig.patch.set_facecolor("#0d0d1a")
-    fig.suptitle(
-        "Edge Count Distribution per Cascade — FalseNews Dataset",
-        color="white", fontweight="bold", fontsize=13,
-    )
+    fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+    fig.suptitle("Edge count distribution per cascade — FalseNews dataset", fontsize=13)
 
-    plot_order = [("ALL", "#a8dadc"), ("TRUE", "#06d6a0"), ("FALSE", "#e63946"), ("MIXED", "#ffb703")]
+    # different gray shades to distinguish veracity groups in b&w
+    plot_order = [("ALL", "0.6"), ("TRUE", "0.85"), ("FALSE", "0.3"), ("MIXED", "0.5")]
 
-    for ax, (label, color) in zip(axes.flat, plot_order):
-        ax.set_facecolor("#1a1a2e")
-
+    for ax, (label, gray) in zip(axes.flat, plot_order):
         if label == "ALL":
             data = stats["n_edges"].values
         else:
             data = stats.loc[stats["veracity"] == label, "n_edges"].values
 
         if len(data) == 0:
-            ax.set_title(f"{label} (no data)", color="white")
+            ax.set_title(f"{label} (no data)")
             continue
 
-        ax.hist(data, bins=bins, color=color, edgecolor="black", linewidth=0.4, alpha=0.85)
+        ax.hist(data, bins=bins, facecolor=gray, edgecolor="black", linewidth=0.4)
 
         median_val = np.median(data)
         mean_val   = np.mean(data)
-        ax.axvline(median_val, color="white",  linewidth=1.2, linestyle="--", label=f"Median={median_val:.0f}")
-        ax.axvline(mean_val,   color="#ffb703", linewidth=1.2, linestyle=":",  label=f"Mean={mean_val:.0f}")
+        ax.axvline(median_val, color="black", linewidth=1.2, linestyle="--", label=f"median={median_val:.0f}")
+        ax.axvline(mean_val,   color="black", linewidth=1.2, linestyle=":",  label=f"mean={mean_val:.0f}")
 
-        ax.set_title(
-            f"{label}  (n={len(data):,} cascades)",
-            color="white", fontweight="bold",
-        )
-        ax.set_xlabel("Edges per cascade", color="lightgray")
-        ax.set_ylabel("Number of cascades", color="lightgray")
-        ax.tick_params(colors="lightgray")
-        ax.legend(fontsize=8, facecolor="#222", edgecolor="#444", labelcolor="white")
-        for sp in ax.spines.values():
-            sp.set_edgecolor("#444")
+        ax.set_title(f"{label}  ($n={len(data):,}$ cascades)")
+        ax.set_xlabel("edges per cascade")
+        ax.set_ylabel("number of cascades")
+        ax.legend(fontsize=8, frameon=True)
 
     plt.tight_layout()
     out_file = out_dir / "edge_distribution_falsenews.png"
-    fig.savefig(out_file, dpi=150, facecolor=fig.get_facecolor(), bbox_inches="tight")
+    fig.savefig(out_file, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved -> {out_file}")
 

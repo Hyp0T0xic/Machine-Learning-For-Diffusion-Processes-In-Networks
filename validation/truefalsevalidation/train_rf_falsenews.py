@@ -12,7 +12,7 @@ import random
 from collections import defaultdict
 from pathlib import Path
 
-_REPO_ROOT = Path(__file__).resolve().parent.parent
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_REPO_ROOT))
 
 import matplotlib
@@ -22,7 +22,7 @@ import numpy as np
 from sklearn.model_selection import StratifiedGroupKFold
 import joblib
 
-from validation.load_falsenews import load_falsenews_cascades
+from validation.truefalsevalidation.load_falsenews import load_falsenews_cascades
 from src.features.extract import build_feature_matrix
 from src.models.random_forest import SourceRandomForest
 from src.baselines.centrality import predict_all
@@ -159,51 +159,48 @@ def _print_results(avg_metrics):
 
 # -- Plots -------------------------------------------------------------------
 
-def _plot_comparison(avg_metrics):
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
-    fig.patch.set_facecolor("#0d0d1a")
+HATCHES = {
+    "rf_falsenews": "",
+    "RF (IC-BA)":   "////",
+    "RF (IC-ER)":   "\\\\\\\\",
+    "jordan":       "xxxx",
+    "closeness":    "----",
+    "betweenness":  "||||",
+    "degree":       "....",
+    "random":       "oooo",
+}
 
-    palette = {
-        "rf_falsenews": "#06d6a0",
-        "RF (IC-BA)":   "#ffb703",
-        "RF (IC-ER)":   "#e76f51",
-        "jordan":       "#e63946",
-        "closeness":    "#f4a261",
-        "betweenness":  "#2ec4b6",
-        "degree":       "#a8dadc",
-        "random":       "#888888",
-    }
+
+def _plot_comparison(avg_metrics):
+    plt.style.use("default")
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
 
     present = [m for m in METHOD_ORDER if m in avg_metrics]
     x = np.arange(len(present))
 
     for ax, k, title in zip(axes, [1, 3], [
-        f"Top-1 Accuracy — FalseNews Validation (size={TARGET_SIZE})",
-        f"Top-3 Accuracy — FalseNews Validation (size={TARGET_SIZE})",
+        f"top-1 accuracy — FalseNews validation (size={TARGET_SIZE})",
+        f"top-3 accuracy — FalseNews validation (size={TARGET_SIZE})",
     ]):
-        ax.set_facecolor("#1a1a2e")
         vals = [100 * avg_metrics[m]["top_k"][k] for m in present]
         errs = [100 * avg_metrics[m]["top_k_std"][k] for m in present]
-        colors = [palette.get(m, "#888") for m in present]
-        ax.bar(x, vals, yerr=errs, color=colors, edgecolor="black",
-               linewidth=0.5, capsize=3,
-               error_kw={"ecolor": "white", "alpha": 0.6})
+        hatches = [HATCHES.get(m, "") for m in present]
+        for xi, (val, err, hatch) in enumerate(zip(vals, errs, hatches)):
+            ax.bar(xi, val, yerr=err, facecolor="white", hatch=hatch,
+                   edgecolor="black", linewidth=0.5, capsize=3,
+                   error_kw={"ecolor": "black", "alpha": 0.7})
         ax.set_xticks(x)
         ax.set_xticklabels(
             [METHOD_LABELS[m] for m in present],
-            color="lightgray", rotation=30, ha="right", fontsize=9,
+            rotation=30, ha="right", fontsize=9,
         )
-        ax.set_ylabel(f"Top-{k} Accuracy (%)", color="lightgray")
-        ax.set_title(title, color="white", fontweight="bold", fontsize=10)
+        ax.set_ylabel(f"top-{k} accuracy (%)")
+        ax.set_title(title, fontsize=10)
         ax.set_ylim(0, 105)
-        ax.tick_params(colors="lightgray")
-        for sp in ax.spines.values():
-            sp.set_edgecolor("#444")
 
     plt.tight_layout()
     out_file = OUT_DIR / "falsenews_comparison.png"
-    fig.savefig(out_file, dpi=150, facecolor=fig.get_facecolor(),
-                bbox_inches="tight")
+    fig.savefig(out_file, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"\nSaved comparison plot -> {out_file}")
     return out_file
@@ -216,29 +213,19 @@ def _plot_feature_importances(avg_importances):
     sorted_imp = sorted(avg_importances.items(), key=lambda x: x[1])
     features, scores = zip(*sorted_imp)
 
+    plt.style.use("default")
     fig, ax = plt.subplots(figsize=(8, 6))
-    fig.patch.set_facecolor("#0d0d1a")
-    ax.set_facecolor("#1a1a2e")
 
     y_pos = np.arange(len(features))
-    ax.barh(y_pos, scores, align="center", color="#06d6a0", edgecolor="black")
+    ax.barh(y_pos, scores, align="center", facecolor="white", edgecolor="black", linewidth=0.7)
     ax.set_yticks(y_pos)
-    ax.set_yticklabels(features, color="lightgray")
-    ax.set_xlabel(
-        f"Mean Decrease in Impurity (avg over {len(SEEDS)} seeds)",
-        color="lightgray",
-    )
-    ax.set_title(
-        f"RF Feature Importances — FalseNews (size={TARGET_SIZE})",
-        color="white", fontweight="bold",
-    )
-    ax.tick_params(colors="lightgray")
-    for sp in ax.spines.values():
-        sp.set_edgecolor("#444")
+    ax.set_yticklabels(features)
+    ax.set_xlabel(f"mean decrease in impurity (avg over {len(SEEDS)} seeds)")
+    ax.set_title(f"RF feature importances — FalseNews (size={TARGET_SIZE})")
 
     plt.tight_layout()
     out_file = OUT_DIR / "rf_feature_importance_falsenews.png"
-    fig.savefig(out_file, dpi=150, facecolor=fig.get_facecolor())
+    fig.savefig(out_file, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved importance plot -> {out_file}")
     return out_file
