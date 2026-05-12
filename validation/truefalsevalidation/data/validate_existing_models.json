@@ -1,0 +1,66 @@
+{
+  "n_cascades": 5676,
+  "target_size": 25,
+  "method_labels": {
+    "RF (IC-BA)": "RF (trained IC-BA)",
+    "RF (IC-ER)": "RF (trained IC-ER)",
+    "jordan": "Jordan Centre",
+    "closeness": "Closeness",
+    "betweenness": "Betweenness",
+    "degree": "Degree",
+    "random": "Random"
+  },
+  "method_order": [
+    "RF (IC-BA)",
+    "RF (IC-ER)",
+    "jordan",
+    "closeness",
+    "betweenness",
+    "degree",
+    "random"
+  ],
+  "metrics": {
+    "RF (IC-BA)": {
+      "top_1": 0.8766737138830162,
+      "top_3": 0.9531360112755461,
+      "mrr": 0.9158117613040601,
+      "mean_distance": 0.13812544045102185
+    },
+    "RF (IC-ER)": {
+      "top_1": 0.9339323467230444,
+      "top_3": 0.9807963354474982,
+      "mrr": 0.9588443693379827,
+      "mean_distance": 0.06906272022551092
+    },
+    "jordan": {
+      "top_1": 0.9608879492600423,
+      "top_3": 0.9947145877378436,
+      "mrr": 0.9783204276944418,
+      "mean_distance": 0.0408738548273432
+    },
+    "degree": {
+      "top_1": 0.9795630725863284,
+      "top_3": 0.9992952783650458,
+      "mrr": 0.9892823584684048,
+      "mean_distance": 0.022903453136011276
+    },
+    "closeness": {
+      "top_1": 0.9823819591261451,
+      "top_3": 0.9987667371388301,
+      "mrr": 0.9905497280497281,
+      "mean_distance": 0.01849894291754757
+    },
+    "betweenness": {
+      "top_1": 0.9823819591261451,
+      "top_3": 0.9989429175475687,
+      "mrr": 0.990637479445619,
+      "mean_distance": 0.019027484143763214
+    },
+    "random": {
+      "top_1": 0.03646934460887949,
+      "top_3": 0.11680761099365751,
+      "mrr": 0.1499226993530302,
+      "mean_distance": 1.0274841437632136
+    }
+  }
+}
