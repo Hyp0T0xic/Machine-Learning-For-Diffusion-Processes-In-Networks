@@ -137,7 +137,9 @@ Independent Cascade (IC): each infected node attempts to infect each neighbour o
 
 R₀ values: **0.5, 1.0, 2.0, 3.0, 5.0** — 1000 cascades collected per R₀ per network.
 
-The size=25 cutoff is justified empirically in `scripts/experiments/plot_cascade_size.py` — below R₀=1 the simulation cost grows exponentially, and above size=25 the cost becomes impractical at subcritical R₀ values.
+
+The size=25 cutoff is justified empirically in `scripts/experiments/plot_cascade_size.py`. Below \(R_0=1\), large cascades become increasingly rare, leading to a rapid increase in the number of simulations required to collect qualifying cascades. Cascade sizes above 25 were therefore considered computationally impractical in the subcritical regime.
+
 
 ---
 
