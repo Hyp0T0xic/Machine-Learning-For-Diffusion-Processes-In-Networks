@@ -9,8 +9,12 @@ In many real-world settings (epidemiology, social media, information spreading) 
 ## Pipeline
 
 ```
-1. Generate networks   →   2. Simulate cascades   →   3. Extract features   →   4. Train & evaluate ML
-   (ER, BA, Complete)        (IC / SI / SIR)              (centrality, etc.)        (vs. classical baselines)
+1. Generate networks   →   2. Simulate cascades   →   3. Extract features   →   4. Train & evaluate RF
+   (ER, BA)                  (IC, size >= 25)           (centrality, etc.)        (vs. classical baselines)
+                                                                                          |
+                                                                                  5. Validate on real data
+                                                                                     (Weibo, OutbreakTrees,
+                                                                                      FalseNews)
 ```
 
 ---
@@ -20,44 +24,78 @@ In many real-world settings (epidemiology, social media, information spreading) 
 ```
 .
 ├── configs/
-│   └── default.yaml              # Hyperparameters & paths
+│   └── default.yaml
 │
-├── scripts/                      # Runnable entry points
-│   ├── generate_networks.py      # Phase 1 — build contact graphs
-│   └── run_simulation.py         # Phase 2 — simulate cascades
+├── scripts/
+│   ├── generate_networks.py              # build contact graphs
+│   ├── run_simulation.py                 # simulate cascades
+│   ├── predict_patient_zero_ic.py        # run inference with a trained model
+│   └── experiments/
+│       ├── train_rf_ic_ba.py             # train RF on IC-BA cascades
+│       ├── train_rf_ic_er.py             # train RF on IC-ER cascades
+│       ├── plot_cascades_ic_ba.py        # visualise example BA cascades
+│       ├── plot_cascades_ic_er.py        # visualise example ER cascades
+│       ├── plot_cascade_size.py          # total runs needed vs R0 (justifies size=25 cutoff)
+│       ├── plot_cascade_size_continuous.py  # same but R0 as a continuous variable
+│       ├── plot_cascade_size_threshold.py   # runs needed vs size threshold at fixed R0
+│       ├── ablation_study.py
+│       └── tune_rf_ba.py
 │
-├── src/                          # Importable library
+├── src/                                  # importable library
 │   ├── data/
-│   │   ├── cascade.py            # CascadeResult dataclass + IC / SI / SIR models
-│   │   ├── networks.py           # ER, BA, Complete graph generation
-│   │   └── simulate.py           # Experiment runner, JSON I/O
+│   │   ├── cascade.py                    # CascadeResult dataclass + IC model
+│   │   ├── networks.py                   # ER and BA graph generation
+│   │   └── simulate.py                   # experiment runner, JSON I/O
 │   ├── features/
-│   │   ├── preprocess.py         # Undirected conversion, trivial-cascade filtering
-│   │   └── extract.py            # Node-level structural features for ML
-│   ├── models/                   # ML model definitions (GNN, MLP — future)
+│   │   ├── preprocess.py                 # undirected conversion, trivial-cascade filtering
+│   │   └── extract.py                    # node-level structural features for ML
+│   ├── models/
+│   │   └── random_forest.py              # RF wrapper with rank_nodes interface
 │   ├── baselines/
-│   │   └── centrality.py         # Jordan centroid, degree/closeness/betweenness
+│   │   └── centrality.py                 # Jordan centre, degree baseline
 │   ├── evaluation/
-│   │   └── metrics.py            # Top-k accuracy, MRR, distance to source
-│   ├── visualization/
-│   │   ├── networks.py           # Network comparison plots
-│   │   └── cascades.py           # Cascade tree & comparison-grid plots
-│   └── utils.py                  # Seed setting, config loading, helpers
-│
-├── data/
-│   ├── networks/                 # .graphml contact network files
-│   ├── raw/                      # cascades.json — simulated labeled data
-│   ├── processed/                # Extracted feature matrices (future)
-│   └── splits/                   # Train / val / test indices (future)
+│   │   └── metrics.py                    # top-k accuracy, MRR
+│   └── visualization/
+│       ├── networks.py
+│       └── cascades.py
 │
 ├── results/
-│   ├── figures/                  # Generated plots
-│   ├── tables/                   # CSV / LaTeX result tables
-│   └── logs/                     # Run logs
+│   ├── figures/
+│   │   ├── cascades/                     # example cascade plots
+│   │   ├── networks/                     # network structure plots
+│   │   └── ml_evaluation/               # accuracy plots, feature importances, size justification
+│   └── models/
+│       ├── ic_ba/rf_model_size25.pkl
+│       └── ic_er/rf_model_size25.pkl
+│
+├── validation/
+│   ├── weibovalidation/                  # Weibo repost cascade validation
+│   │   ├── scripts/
+│   │   │   ├── validate_weibo.py         # evaluate RF models on real Weibo cascades
+│   │   │   ├── validate_outbreak_trees.py
+│   │   │   ├── plot_weibo_cascades.py
+│   │   │   └── plot_outbreak_trees_cascades.py
+│   │   └── figures/
+│   │       ├── weibo_validation_large.png
+│   │       ├── outbreak_trees_validation.png
+│   │       └── cascades/
+│   └── truefalsevalidation/              # FalseNews dataset validation
+│       ├── load_falsenews.py
+│       ├── train_rf_falsenews.py
+│       ├── validate_existing_models.py
+│       ├── r0_analysis_falsenews.py
+│       ├── plot_edge_distribution.py
+│       └── results/
+│
+├── data/
+│   ├── networks/                         # .graphml contact network files
+│   └── raw/                              # cascades.json — simulated labelled data
 │
 ├── notebooks/
 │   ├── 01_network_exploration.ipynb
-│   └── 02_diffusion_exploration.ipynb
+│   ├── 02_diffusion_exploration.ipynb
+│   ├── 05_IC_on_erdos_renyi.ipynb
+│   └── 06_IC_on_barabasi_albert.ipynb
 │
 ├── requirements.txt
 └── README.md
@@ -70,11 +108,16 @@ In many real-world settings (epidemiology, social media, information spreading) 
 ```bash
 pip install -r requirements.txt
 
-# 1. Generate the three contact networks
+# generate networks
 python scripts/generate_networks.py
 
-# 2. Simulate 225 labeled cascades across R₀ ∈ {0.5, 1.0, 1.5, 2.0, 3.0}
-python scripts/run_simulation.py
+# train models (IC on BA and ER, cascade size >= 25, 1000 cascades per R0)
+uv run python scripts/experiments/train_rf_ic_ba.py
+uv run python scripts/experiments/train_rf_ic_er.py
+
+# validate on real-world data
+uv run python validation/weibovalidation/scripts/validate_weibo.py
+uv run python validation/weibovalidation/scripts/validate_outbreak_trees.py
 ```
 
 ---
@@ -83,26 +126,39 @@ python scripts/run_simulation.py
 
 | Network | Model | Key property | Params |
 |---|---|---|---|
-| **Erdős–Rényi (ER)** | G(n, p) | Uniform baseline | N=100, p=0.05 |
-| **Barabási–Albert (BA)** | Preferential attachment | Scale-free with hubs | N=100, m=3 |
-| **Complete (K₁₀₀)** | K_n | Max symmetry — negative control | N=100 |
+| **Erdos-Renyi (ER)** | G(n, p) | Uniform, homogeneous degree | N=200, p=6/(N-1) |
+| **Barabasi-Albert (BA)** | Preferential attachment | Scale-free with hubs | N=200, m=3 |
 
-## Diffusion Models
+Both networks are calibrated to average degree ~6.
 
-| Model | Description | R₀ mapping |
-|---|---|---|
-| **IC** | One-shot transmission with prob *p* | p = R₀ / ⟨k⟩ |
-| **SI** | Persistent infection, no recovery | β = R₀ / ⟨k⟩ |
-| **SIR** | Infection + recovery (prob γ) | β = R₀ · γ / ⟨k⟩ |
+## Diffusion Model
 
-R₀ values tested: **0.5, 1.0, 1.5, 2.0, 3.0** → total **225 cascades** (3 nets × 3 models × 5 R₀ × 5 sources).
+Independent Cascade (IC): each infected node attempts to infect each neighbour once with probability p = R₀ / avg_degree. Only cascades of size >= 25 are kept for training.
+
+R₀ values: **0.5, 1.0, 2.0, 3.0, 5.0** — 1000 cascades collected per R₀ per network.
+
+The size=25 cutoff is justified empirically in `scripts/experiments/plot_cascade_size.py` — below R₀=1 the simulation cost grows exponentially, and above size=25 the cost becomes impractical at subcritical R₀ values.
 
 ---
 
-## Evaluation Metrics
+## ML Model
 
-| Metric | Description |
+Random Forest trained per network type (IC-BA, IC-ER). Features are node-level structural properties extracted from the observed undirected cascade. The model outputs a ranking of candidate source nodes.
+
+Baselines: **Jordan Centre**, **Degree**.
+
+Evaluation: **Top-1 and Top-3 accuracy**, averaged across 5 seeds with stratified group cross-validation.
+
+---
+
+## Validation
+
+Models trained on synthetic IC cascades are evaluated on three real-world datasets:
+
+| Dataset | Description |
 |---|---|
-| **Top-k accuracy** | True source appears in top-k ranked nodes |
-| **MRR** | Mean reciprocal rank of the true source |
-| **Distance to source** | Hop distance between rank-1 prediction and true source |
+| **Weibo** | Real repost cascades from Weibo (Chinese microblog), filtered to 500-2000 nodes |
+| **OutbreakTrees** | Biological transmission trees from real disease outbreaks |
+| **FalseNews** | Misinformation propagation cascades, used for separate RF training and R₀ analysis |
+
+Results saved to `validation/weibovalidation/figures/` and `validation/truefalsevalidation/results/`.
