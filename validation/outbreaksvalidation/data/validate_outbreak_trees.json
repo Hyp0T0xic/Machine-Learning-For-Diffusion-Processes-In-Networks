@@ -1,0 +1,48 @@
+{
+  "n_cascades": 59,
+  "n_seeds": 5,
+  "min_cascade_size": 15,
+  "max_cascade_size": 300,
+  "method_labels": {
+    "RF (IC-BA)": "Random Forest (IC-BA)",
+    "RF (IC-ER)": "Random Forest (IC-ER)",
+    "Jordan Center": "Jordan Centre",
+    "Degree": "Degree"
+  },
+  "method_order": [
+    "RF (IC-BA)",
+    "RF (IC-ER)",
+    "Jordan Center",
+    "Degree"
+  ],
+  "metrics": {
+    "RF (IC-BA)": {
+      "top_1": 32.20338983050847,
+      "top_3": 53.22033898305085,
+      "top_1_std": 0.0,
+      "top_3_std": 0.8303355060281921,
+      "total": 59
+    },
+    "RF (IC-ER)": {
+      "top_1": 35.59322033898305,
+      "top_3": 52.54237288135594,
+      "top_1_std": 0.0,
+      "top_3_std": 1.0719585288706364,
+      "total": 59
+    },
+    "Jordan Center": {
+      "top_1": 47.45762711864407,
+      "top_3": 68.47457627118645,
+      "top_1_std": 3.8650014410140296,
+      "top_3_std": 1.3559322033898311,
+      "total": 59
+    },
+    "Degree": {
+      "top_1": 46.10169491525424,
+      "top_3": 69.49152542372882,
+      "top_1_std": 0.6779661016949148,
+      "top_3_std": 1.071958528870641,
+      "total": 59
+    }
+  }
+}
