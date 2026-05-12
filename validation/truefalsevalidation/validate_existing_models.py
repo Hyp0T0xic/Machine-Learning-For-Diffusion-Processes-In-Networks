@@ -32,7 +32,7 @@ MODEL_PATHS = {
     "RF (IC-BA)": _REPO_ROOT / "results/models/ic_ba/rf_model_size25.pkl",
     "RF (IC-ER)": _REPO_ROOT / "results/models/ic_er/rf_model_size25.pkl",
 }
-OUT_DIR = _REPO_ROOT / "validation/results/figures"
+OUT_DIR = _REPO_ROOT / "validation/truefalsevalidation/figures"
 
 METHOD_LABELS = {
     "RF (IC-BA)":  "RF (trained IC-BA)",
@@ -113,17 +113,6 @@ def main() -> None:
     _plot_accuracy(metrics, len(cascades))
 
 
-HATCHES = {
-    "RF (IC-BA)":  "",
-    "RF (IC-ER)":  "////",
-    "jordan":      "\\\\\\\\",
-    "closeness":   "xxxx",
-    "betweenness": "----",
-    "degree":      "||||",
-    "random":      "....",
-}
-
-
 def _plot_accuracy(metrics: dict, n_cascades: int) -> None:
     plt.style.use("default")
     fig, axes = plt.subplots(1, 2, figsize=(12, 6))
@@ -136,9 +125,8 @@ def _plot_accuracy(metrics: dict, n_cascades: int) -> None:
         f"top-3 accuracy — existing models on FalseNews ($n={n_cascades}$)",
     ]):
         vals = [100 * metrics[m]["top_k"][k] for m in methods_present]
-        for xi, (val, method) in enumerate(zip(vals, methods_present)):
-            ax.bar(xi, val, facecolor="white", hatch=HATCHES.get(method, ""),
-                   edgecolor="black", linewidth=0.5)
+        for xi, val in enumerate(vals):
+            ax.bar(xi, val, facecolor="white", edgecolor="black", linewidth=0.5)
         ax.set_xticks(x)
         ax.set_xticklabels(
             [METHOD_LABELS[m] for m in methods_present],

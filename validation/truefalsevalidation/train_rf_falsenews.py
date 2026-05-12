@@ -32,8 +32,8 @@ from src.evaluation.metrics import evaluate_ranker
 
 TARGET_SIZE   = 25
 SEEDS         = [42, 123, 456, 789, 1024]
-OUT_DIR       = _REPO_ROOT / "validation/results/figures"
-MODEL_DIR     = _REPO_ROOT / "validation/results/models"
+OUT_DIR       = _REPO_ROOT / "validation/truefalsevalidation/figures"
+MODEL_DIR     = _REPO_ROOT / "validation/truefalsevalidation/models"
 
 # these never saw FalseNews data so no leakage concern
 EXISTING_MODELS = {
@@ -159,18 +159,6 @@ def _print_results(avg_metrics):
 
 # -- Plots -------------------------------------------------------------------
 
-HATCHES = {
-    "rf_falsenews": "",
-    "RF (IC-BA)":   "////",
-    "RF (IC-ER)":   "\\\\\\\\",
-    "jordan":       "xxxx",
-    "closeness":    "----",
-    "betweenness":  "||||",
-    "degree":       "....",
-    "random":       "oooo",
-}
-
-
 def _plot_comparison(avg_metrics):
     plt.style.use("default")
     fig, axes = plt.subplots(1, 2, figsize=(12, 6))
@@ -184,9 +172,8 @@ def _plot_comparison(avg_metrics):
     ]):
         vals = [100 * avg_metrics[m]["top_k"][k] for m in present]
         errs = [100 * avg_metrics[m]["top_k_std"][k] for m in present]
-        hatches = [HATCHES.get(m, "") for m in present]
-        for xi, (val, err, hatch) in enumerate(zip(vals, errs, hatches)):
-            ax.bar(xi, val, yerr=err, facecolor="white", hatch=hatch,
+        for xi, (val, err) in enumerate(zip(vals, errs)):
+            ax.bar(xi, val, yerr=err, facecolor="white",
                    edgecolor="black", linewidth=0.5, capsize=3,
                    error_kw={"ecolor": "black", "alpha": 0.7})
         ax.set_xticks(x)

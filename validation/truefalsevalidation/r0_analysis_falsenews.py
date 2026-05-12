@@ -41,7 +41,7 @@ from src.evaluation.metrics import evaluate_ranker
 
 TARGET_SIZE = 25
 SEEDS       = [42, 123, 456, 789, 1024]
-OUT_DIR     = _REPO_ROOT / "validation/results/figures"
+OUT_DIR     = _REPO_ROOT / "validation/truefalsevalidation/figures"
 
 # Pre-filtered CSV: all cascades already have >= 25 reachable nodes
 CSV_PATH = (
@@ -65,16 +65,6 @@ METHOD_LABELS = {
     "random":       "Random",
 }
 METHOD_ORDER = list(METHOD_LABELS.keys())
-
-HATCHES = {
-    "rf_falsenews": "",
-    "jordan":       "////",
-    "closeness":    "\\\\\\\\",
-    "betweenness":  "xxxx",
-    "degree":       "----",
-    "random":       "....",
-}
-
 
 # -- Helpers -----------------------------------------------------------------
 
@@ -203,7 +193,7 @@ def _plot_r0_distribution(r0_values, out_dir):
     plt.style.use("default")
     fig, ax = plt.subplots(figsize=(9, 5))
 
-    ax.hist(r0_values, bins=40, facecolor="0.7", edgecolor="black", linewidth=0.5)
+    ax.hist(r0_values, bins=40, facecolor="white", edgecolor="black", linewidth=0.5)
 
     for (lo, _), label in zip(R0_BINS[1:], R0_LABELS[1:]):
         ax.axvline(lo, color="black", linewidth=1.2, linestyle="--", alpha=0.6)
@@ -263,7 +253,6 @@ def _plot_accuracy_by_r0(avg_metrics, out_dir):
                 yerr=errs,
                 label=METHOD_LABELS[method],
                 facecolor="white",
-                hatch=HATCHES.get(method, ""),
                 edgecolor="black", linewidth=0.5,
                 capsize=2,
                 error_kw={"ecolor": "black", "alpha": 0.7},
