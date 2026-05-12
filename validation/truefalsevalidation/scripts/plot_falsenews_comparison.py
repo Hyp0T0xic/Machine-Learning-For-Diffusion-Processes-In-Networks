@@ -17,7 +17,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 DATA_DIR   = _REPO_ROOT / "validation/truefalsevalidation/data"
 OUT_DIR    = _REPO_ROOT / "validation/truefalsevalidation/figures"
 
@@ -30,7 +30,8 @@ def _plot_comparison(data: dict) -> None:
     labels       = data["method_labels"]
     target_size  = data["target_size"]
 
-    present = [m for m in method_order if m in metrics]
+    KEEP = {"rf_falsenews", "RF (IC-BA)", "RF (IC-ER)", "jordan", "degree", "random"}
+    present = [m for m in method_order if m in metrics and m in KEEP]
     x = np.arange(len(present))
 
     plt.style.use("default")
@@ -44,6 +45,7 @@ def _plot_comparison(data: dict) -> None:
         for xi, val in enumerate(vals):
             ax.bar(xi, val, facecolor=COLORS[xi % len(COLORS)],
                    edgecolor="black", linewidth=0.5)
+            ax.text(xi, val + 0.5, f"{val:.1f}%", ha="center", va="bottom", fontsize=8)
         ax.set_xticks(x)
         ax.set_xticklabels(
             [labels[m] for m in present],
@@ -70,12 +72,15 @@ def _plot_feature_importances(data: dict) -> None:
     features, scores = zip(*sorted_imp)
 
     plt.style.use("default")
-    fig, ax = plt.subplots(figsize=(8, 6))
+    fig, ax = plt.subplots(figsize=(10, 6))
 
     y_pos = np.arange(len(features))
     bar_colors = [COLORS[i % len(COLORS)] for i in range(len(features))]
     ax.barh(y_pos, scores, align="center", color=bar_colors,
             edgecolor="black", linewidth=0.7)
+    for y, score in zip(y_pos, scores):
+        ax.text(score + max(scores) * 0.01, y, f"{score:.3f}",
+                va="center", fontsize=8)
     ax.set_yticks(y_pos)
     ax.set_yticklabels(features)
     ax.set_xlabel(f"mean decrease in impurity (avg over {data['n_seeds']} seeds)")

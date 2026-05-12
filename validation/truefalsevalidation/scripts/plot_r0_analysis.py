@@ -17,7 +17,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 DATA_DIR   = _REPO_ROOT / "validation/truefalsevalidation/data"
 OUT_DIR    = _REPO_ROOT / "validation/truefalsevalidation/figures"
 
@@ -28,28 +28,37 @@ R0_BINS = [(0.0, 0.75), (0.75, 1.5), (1.5, 2.5), (2.5, 4.0), (4.0, float("inf"))
 
 def _plot_r0_distribution(data: dict) -> None:
     r0_values   = data["r0_values"]
-    r0_labels   = data["r0_labels"]
     target_size = data["target_size"]
+
+    int_bins   = [1, 2, 3, 4, 5, float("inf")]
+    bin_labels = ["1-2", "2-3", "3-4", "4-5", "5+"]
+    counts = [
+        sum(1 for r in r0_values if lo <= r < hi)
+        for lo, hi in zip(int_bins[:-1], int_bins[1:])
+    ]
 
     plt.style.use("default")
     fig, ax = plt.subplots(figsize=(9, 5))
 
-    ax.hist(r0_values, bins=40, facecolor=COLORS[0], edgecolor="black", linewidth=0.5)
+    x    = np.arange(len(bin_labels))
+    bars = ax.bar(x, counts, width=0.6,
+                  color=COLORS[:len(bin_labels)], edgecolor="black", linewidth=0.5)
 
-    for (lo, _), label in zip(R0_BINS[1:], r0_labels[1:]):
-        ax.axvline(lo, color="black", linewidth=1.2, linestyle="--", alpha=0.6)
+    total = len(r0_values)
+    for bar, count in zip(bars, counts):
+        pct = 100 * count / total
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + ax.get_ylim()[1] * 0.01,
+            f"$n={count}$\n{pct:.1f}%",
+            ha="center", va="bottom", fontsize=9,
+        )
 
-    ax.set_xlabel("estimated $R_0$ (mean secondary infections per spreading node)")
+    ax.set_xticks(x)
+    ax.set_xticklabels([f"$R_0 \\in [{lbl})$" for lbl in bin_labels])
+    ax.set_xlabel("estimated $R_0$ bin (mean secondary infections per spreading node)")
     ax.set_ylabel("number of cascades")
     ax.set_title(f"$R_0$ distribution -- FalseNews cascades ($n={len(r0_values)}$, size={target_size})")
-
-    x_prev = 0
-    for (lo, hi), label in zip(R0_BINS, r0_labels):
-        x_mid = (x_prev + min(hi, max(r0_values))) / 2
-        count = sum(1 for r in r0_values if lo <= r < hi)
-        ax.text(x_mid, ax.get_ylim()[1] * 0.92, f"{label}\n$n={count}$",
-                ha="center", va="top", fontsize=8)
-        x_prev = lo
 
     plt.tight_layout()
     out_file = OUT_DIR / "r0_distribution_falsenews.png"
@@ -94,6 +103,10 @@ def _plot_accuracy_by_r0(data: dict) -> None:
                 facecolor=COLORS[i % len(COLORS)],
                 edgecolor="black", linewidth=0.5,
             )
+            for xi, val in enumerate(vals):
+                if val > 0:
+                    ax.text(x[xi] + offsets[i], val + 0.5, f"{val:.0f}%",
+                            ha="center", va="bottom", fontsize=6, rotation=45)
 
         ax.set_xticks(x)
         ax.set_xticklabels(active_labels)
