@@ -45,8 +45,8 @@ from src.features.extract import build_feature_matrix
 N_NODES = 200
 BA_M = 3
 R0_VALUES = [0.5, 1.0, 2.0, 3.0, 5.0]
-CASCADE_SIZE = 30
-N_TARGET = 1500  # Smaller target per R0 for faster tuning (total 2500 cascades)
+CASCADE_SIZE = 25
+N_TARGET = 1000  # Smaller target per R0 for faster tuning (total 2500 cascades)
 SEED = 42
 OUT_DIR = Path("results/figures/ml_evaluation")
 
