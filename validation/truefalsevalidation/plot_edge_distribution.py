@@ -73,9 +73,14 @@ def plot(stats: pd.DataFrame, out_dir: Path) -> None:
     fig.suptitle("Edge count distribution per cascade — FalseNews dataset", fontsize=13)
 
     # different gray shades to distinguish veracity groups in b&w
-    plot_order = ["ALL", "TRUE", "FALSE", "MIXED"]
+    plot_order = [
+        ("ALL",   "#cecece"),
+        ("TRUE",  "#59a89c"),
+        ("FALSE", "#e02b35"),
+        ("MIXED", "#f0c571"),
+    ]
 
-    for ax, label in zip(axes.flat, plot_order):
+    for ax, (label, color) in zip(axes.flat, plot_order):
         if label == "ALL":
             data = stats["n_edges"].values
         else:
@@ -85,7 +90,7 @@ def plot(stats: pd.DataFrame, out_dir: Path) -> None:
             ax.set_title(f"{label} (no data)")
             continue
 
-        ax.hist(data, bins=bins, facecolor="white", edgecolor="black", linewidth=0.4)
+        ax.hist(data, bins=bins, facecolor=color, edgecolor="black", linewidth=0.4)
 
         median_val = np.median(data)
         mean_val   = np.mean(data)

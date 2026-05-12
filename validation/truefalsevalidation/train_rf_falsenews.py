@@ -2,11 +2,13 @@
 """
 Train RF on FalseNews cascades and compare to IC-trained models + baselines.
 Feature matrix built once, only the train/test split varies across seeds.
+Saves metrics + feature importances to JSON for separate plotting.
 
-Usage: python validation/train_rf_falsenews.py
+Usage: python validation/truefalsevalidation/train_rf_falsenews.py
 """
 from __future__ import annotations
 
+import json
 import sys
 import random
 from collections import defaultdict
@@ -15,9 +17,6 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_REPO_ROOT))
 
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.model_selection import StratifiedGroupKFold
 import joblib
@@ -32,10 +31,9 @@ from src.evaluation.metrics import evaluate_ranker
 
 TARGET_SIZE   = 25
 SEEDS         = [42, 123, 456, 789, 1024]
-OUT_DIR       = _REPO_ROOT / "validation/truefalsevalidation/figures"
+DATA_DIR      = _REPO_ROOT / "validation/truefalsevalidation/data"
 MODEL_DIR     = _REPO_ROOT / "validation/truefalsevalidation/models"
 
-# these never saw FalseNews data so no leakage concern
 EXISTING_MODELS = {
     "RF (IC-BA)": _REPO_ROOT / "results/models/ic_ba/rf_model_size25.pkl",
     "RF (IC-ER)": _REPO_ROOT / "results/models/ic_er/rf_model_size25.pkl",
@@ -65,12 +63,9 @@ def _evaluate_random(results, seed=42):
 
 
 def _run_seed(cascades, X, y, groups, feature_names, existing_models, seed):
-    """One fold: train on 80%, eval everything on held-out 20%."""
-
     sgkf = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=seed)
     train_idx, test_idx = next(sgkf.split(X, y, groups=groups))
 
-    # same hyperparams as IC scripts
     rf = SourceRandomForest(
         n_estimators=500,
         max_depth=10,
@@ -84,7 +79,6 @@ def _run_seed(cascades, X, y, groups, feature_names, existing_models, seed):
     test_cascade_indices = sorted(set(groups[i] for i in test_idx))
     test_cascades = [cascades[i] for i in test_cascade_indices]
 
-    # eval all methods on same test set for fair comparison
     metrics: dict[str, dict] = {}
 
     rf_rankings = [rf.rank_nodes(c) for c in test_cascades]
@@ -151,81 +145,19 @@ def _print_results(avg_metrics):
             t1_std = 100 * m["top_k_std"][1]
             t3_std = 100 * m["top_k_std"][3]
             print(f"{METHOD_LABELS[method]:<25}  "
-                  f"{t1:>5.1f}±{t1_std:>4.1f}%  "
-                  f"{t3:>5.1f}±{t3_std:>4.1f}%  "
+                  f"{t1:>5.1f}+/-{t1_std:>4.1f}%  "
+                  f"{t3:>5.1f}+/-{t3_std:>4.1f}%  "
                   f"{m['mrr']:>8.4f}")
     print("=" * 90)
 
 
-# -- Plots -------------------------------------------------------------------
-
-def _plot_comparison(avg_metrics):
-    plt.style.use("default")
-    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
-
-    present = [m for m in METHOD_ORDER if m in avg_metrics]
-    x = np.arange(len(present))
-
-    for ax, k, title in zip(axes, [1, 3], [
-        f"top-1 accuracy — FalseNews validation (size={TARGET_SIZE})",
-        f"top-3 accuracy — FalseNews validation (size={TARGET_SIZE})",
-    ]):
-        vals = [100 * avg_metrics[m]["top_k"][k] for m in present]
-        errs = [100 * avg_metrics[m]["top_k_std"][k] for m in present]
-        for xi, (val, err) in enumerate(zip(vals, errs)):
-            ax.bar(xi, val, yerr=err, facecolor="white",
-                   edgecolor="black", linewidth=0.5, capsize=3,
-                   error_kw={"ecolor": "black", "alpha": 0.7})
-        ax.set_xticks(x)
-        ax.set_xticklabels(
-            [METHOD_LABELS[m] for m in present],
-            rotation=30, ha="right", fontsize=9,
-        )
-        ax.set_ylabel(f"top-{k} accuracy (%)")
-        ax.set_title(title, fontsize=10)
-        ax.set_ylim(0, 105)
-
-    plt.tight_layout()
-    out_file = OUT_DIR / "falsenews_comparison.png"
-    fig.savefig(out_file, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    print(f"\nSaved comparison plot -> {out_file}")
-    return out_file
-
-
-def _plot_feature_importances(avg_importances):
-    if not avg_importances:
-        return None
-
-    sorted_imp = sorted(avg_importances.items(), key=lambda x: x[1])
-    features, scores = zip(*sorted_imp)
-
-    plt.style.use("default")
-    fig, ax = plt.subplots(figsize=(8, 6))
-
-    y_pos = np.arange(len(features))
-    ax.barh(y_pos, scores, align="center", facecolor="white", edgecolor="black", linewidth=0.7)
-    ax.set_yticks(y_pos)
-    ax.set_yticklabels(features)
-    ax.set_xlabel(f"mean decrease in impurity (avg over {len(SEEDS)} seeds)")
-    ax.set_title(f"RF feature importances — FalseNews (size={TARGET_SIZE})")
-
-    plt.tight_layout()
-    out_file = OUT_DIR / "rf_feature_importance_falsenews.png"
-    fig.savefig(out_file, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    print(f"Saved importance plot -> {out_file}")
-    return out_file
-
-
 def main() -> None:
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
     cascades, metadata = load_falsenews_cascades(target_size=TARGET_SIZE)
     print(f"\nTraining on {len(cascades)} FalseNews cascades\n")
 
-    # build once - data is fixed so only the split changes per seed
     X, y, index, feature_names = build_feature_matrix(cascades)
     groups = [idx[0] for idx in index]
 
@@ -235,9 +167,9 @@ def main() -> None:
             existing_models[name] = joblib.load(path)
             print(f"  Loaded existing model: {name}")
         else:
-            print(f"  WARNING: model not found — {path}")
+            print(f"  WARNING: model not found -- {path}")
 
-    all_seed_metrics: list[dict]  = []
+    all_seed_metrics: list[dict] = []
     all_seed_importances: list[dict] = []
     all_models: list[SourceRandomForest] = []
 
@@ -254,12 +186,34 @@ def main() -> None:
     avg_importances = _aggregate_importances(all_seed_importances)
 
     _print_results(avg_metrics)
-    _plot_comparison(avg_metrics)
-    _plot_feature_importances(avg_importances)
+
+    # save to JSON
+    json_data = {
+        "target_size": TARGET_SIZE,
+        "n_seeds": len(SEEDS),
+        "method_labels": METHOD_LABELS,
+        "method_order": METHOD_ORDER,
+        "avg_metrics": {},
+        "avg_importances": {k: float(v) for k, v in avg_importances.items()},
+    }
+    for method, m in avg_metrics.items():
+        json_data["avg_metrics"][method] = {
+            "top_1": float(m["top_k"][1]),
+            "top_3": float(m["top_k"][3]),
+            "top_1_std": float(m["top_k_std"][1]),
+            "top_3_std": float(m["top_k_std"][3]),
+            "mrr": float(m["mrr"]),
+            "mrr_std": float(m["mrr_std"]),
+        }
+
+    out_path = DATA_DIR / "train_rf_falsenews.json"
+    with open(out_path, "w") as f:
+        json.dump(json_data, f, indent=2)
+    print(f"\nSaved metrics -> {out_path}")
 
     model_path = MODEL_DIR / "rf_model_falsenews_size25.pkl"
     joblib.dump(all_models[0], model_path)
-    print(f"\nSaved model -> {model_path}")
+    print(f"Saved model -> {model_path}")
 
 
 if __name__ == "__main__":

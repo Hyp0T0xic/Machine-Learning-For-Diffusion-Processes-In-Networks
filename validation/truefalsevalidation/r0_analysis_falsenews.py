@@ -1,22 +1,15 @@
 #!/usr/bin/env python
 """
-validation/r0_analysis_falsenews.py
-=====================================
 Analyse the empirical R0 distribution of the FalseNews validation cascades,
 then compare source-identification accuracy across R0 bins for the
 FalseNews-trained RF and all centrality baselines.
+Saves results to JSON for separate plotting.
 
-Output plots are styled to match rf_vs_baselines_er_ic_size25.png:
-  - r0_distribution_falsenews.png   : histogram of estimated R0
-  - r0_vs_accuracy_falsenews.png    : grouped-bar accuracy by R0 bin
-                                       (same 2-panel top-1 / top-3 layout)
-
-Usage
------
-    python validation/r0_analysis_falsenews.py
+Usage: python validation/truefalsevalidation/r0_analysis_falsenews.py
 """
 from __future__ import annotations
 
+import json
 import sys
 import random
 from collections import defaultdict
@@ -25,9 +18,6 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_REPO_ROOT))
 
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.model_selection import StratifiedGroupKFold
 
@@ -41,9 +31,8 @@ from src.evaluation.metrics import evaluate_ranker
 
 TARGET_SIZE = 25
 SEEDS       = [42, 123, 456, 789, 1024]
-OUT_DIR     = _REPO_ROOT / "validation/truefalsevalidation/figures"
+DATA_DIR    = _REPO_ROOT / "validation/truefalsevalidation/data"
 
-# Pre-filtered CSV: all cascades already have >= 25 reachable nodes
 CSV_PATH = (
     _REPO_ROOT
     / "FalseNews_Code_Data"
@@ -52,7 +41,6 @@ CSV_PATH = (
     / "raw_data_anon_filtered_min25_reachable.csv"
 )
 
-# R0 bins mirroring simulated values 0.5, 1, 2, 3, 5
 R0_BINS   = [(0.0, 0.75), (0.75, 1.5), (1.5, 2.5), (2.5, 4.0), (4.0, float("inf"))]
 R0_LABELS = ["R0~0.5", "R0~1", "R0~2", "R0~3", "R0~5"]
 
@@ -66,7 +54,6 @@ METHOD_LABELS = {
 }
 METHOD_ORDER = list(METHOD_LABELS.keys())
 
-# -- Helpers -----------------------------------------------------------------
 
 def _bin_label(r0: float) -> str | None:
     for (lo, hi), label in zip(R0_BINS, R0_LABELS):
@@ -85,10 +72,7 @@ def _evaluate_random(results, seed=42):
     return evaluate_ranker(results, rankings, ks=[1, 3])
 
 
-# -- Core pipeline -----------------------------------------------------------
-
 def _run_seed(cascades, r0_per_cascade, X, y, groups, feature_names, seed):
-    """Train RF on 80 %, evaluate all methods on 20 %, broken down by R0 bin."""
     sgkf = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=seed)
     train_idx, test_idx = next(sgkf.split(X, y, groups=groups))
 
@@ -103,10 +87,9 @@ def _run_seed(cascades, r0_per_cascade, X, y, groups, feature_names, seed):
     rf.fit(X[train_idx], y[train_idx], feature_names)
 
     test_cascade_indices = sorted(set(groups[i] for i in test_idx))
-    test_cascades  = [cascades[i] for i in test_cascade_indices]
-    test_r0s       = [r0_per_cascade[i] for i in test_cascade_indices]
+    test_cascades = [cascades[i] for i in test_cascade_indices]
+    test_r0s      = [r0_per_cascade[i] for i in test_cascade_indices]
 
-    # group test cascades by R0 bin
     bin_cascades: dict[str, list] = defaultdict(list)
     for c, r0 in zip(test_cascades, test_r0s):
         label = _bin_label(r0)
@@ -140,7 +123,6 @@ def _run_seed(cascades, r0_per_cascade, X, y, groups, feature_names, seed):
 
 
 def _aggregate(all_seed_metrics):
-    """Average top-1 / top-3 across seeds per (R0 bin, method)."""
     avg: dict[str, dict[str, dict]] = {}
     for label in R0_LABELS:
         avg[label] = {}
@@ -160,7 +142,7 @@ def _aggregate(all_seed_metrics):
 
 def _print_results(avg_metrics, bin_counts):
     print(f"\n{'='*100}")
-    print(f"  FALSENEWS — ACCURACY BY R0 BIN  |  SIZE = {TARGET_SIZE}  |  "
+    print(f"  FALSENEWS -- ACCURACY BY R0 BIN  |  SIZE = {TARGET_SIZE}  |  "
           f"AVERAGED OVER {len(SEEDS)} SEEDS")
     print(f"{'='*100}")
     header = f"{'Method':<20}  " + "   ".join(
@@ -187,105 +169,14 @@ def _print_results(avg_metrics, bin_counts):
         print(f"    {label:<15}  n={n}")
 
 
-# -- Plots -------------------------------------------------------------------
-
-def _plot_r0_distribution(r0_values, out_dir):
-    plt.style.use("default")
-    fig, ax = plt.subplots(figsize=(9, 5))
-
-    ax.hist(r0_values, bins=40, facecolor="white", edgecolor="black", linewidth=0.5)
-
-    for (lo, _), label in zip(R0_BINS[1:], R0_LABELS[1:]):
-        ax.axvline(lo, color="black", linewidth=1.2, linestyle="--", alpha=0.6)
-
-    ax.set_xlabel("estimated $R_0$ (mean secondary infections per spreading node)")
-    ax.set_ylabel("number of cascades")
-    ax.set_title(f"$R_0$ distribution — FalseNews cascades ($n={len(r0_values)}$, size={TARGET_SIZE})")
-
-    # annotate bins
-    x_prev = 0
-    for (lo, hi), label in zip(R0_BINS, R0_LABELS):
-        x_mid = (x_prev + min(hi, max(r0_values))) / 2
-        count = sum(1 for r in r0_values if lo <= r < hi)
-        ax.text(x_mid, ax.get_ylim()[1] * 0.92, f"{label}\n$n={count}$",
-                ha="center", va="top", fontsize=8)
-        x_prev = lo
-
-    plt.tight_layout()
-    out_file = out_dir / "r0_distribution_falsenews.png"
-    fig.savefig(out_file, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    print(f"Saved R0 distribution plot -> {out_file}")
-    return out_file
-
-
-def _plot_accuracy_by_r0(avg_metrics, out_dir):
-    active_labels = [lbl for lbl in R0_LABELS if avg_metrics.get(lbl)]
-    if not active_labels:
-        print("No data to plot.")
-        return None
-
-    plt.style.use("default")
-    fig, axes = plt.subplots(2, 1, figsize=(11, 9))
-
-    x       = np.arange(len(active_labels))
-    bar_w   = 0.12
-    n_m     = len(METHOD_ORDER)
-    offsets = np.linspace(-(n_m - 1) / 2 * bar_w, (n_m - 1) / 2 * bar_w, n_m)
-
-    for ax, k_measure, title in zip(axes, [1, 3], [
-        f"top-1 accuracy — FalseNews by estimated $R_0$ (mean over {len(SEEDS)} seeds)",
-        f"top-3 accuracy — FalseNews by estimated $R_0$ (mean over {len(SEEDS)} seeds)",
-    ]):
-        for i, method in enumerate(METHOD_ORDER):
-            vals, errs = [], []
-            for label in active_labels:
-                m = avg_metrics.get(label, {}).get(method)
-                if m:
-                    vals.append(100 * m["top_k"][k_measure])
-                    errs.append(100 * m["top_k_std"][k_measure])
-                else:
-                    vals.append(0)
-                    errs.append(0)
-
-            ax.bar(
-                x + offsets[i], vals, bar_w,
-                yerr=errs,
-                label=METHOD_LABELS[method],
-                facecolor="white",
-                edgecolor="black", linewidth=0.5,
-                capsize=2,
-                error_kw={"ecolor": "black", "alpha": 0.7},
-            )
-
-        ax.set_xticks(x)
-        ax.set_xticklabels(active_labels)
-        ax.set_ylabel(f"top-{k_measure} accuracy (%)")
-        ax.set_title(title)
-        ax.set_ylim(0, 105)
-        if k_measure == 1:
-            ax.legend(fontsize=9, frameon=True, loc="upper left", bbox_to_anchor=(1.02, 1))
-
-    plt.tight_layout()
-    out_file = out_dir / "r0_vs_accuracy_falsenews.png"
-    fig.savefig(out_file, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    print(f"Saved accuracy-by-R0 plot -> {out_file}")
-    return out_file
-
-
-# -- Entry point -------------------------------------------------------------
-
 def main() -> None:
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    # min_size=1 because the CSV is pre-filtered to >= 25 reachable nodes
     cascades, _ = load_falsenews_cascades(
         csv_path=CSV_PATH, target_size=TARGET_SIZE, min_size=1,
     )
     print(f"\nLoaded {len(cascades)} FalseNews cascades\n")
 
-    # --- R0 distribution ----------------------------------------------------
     r0_per_cascade = [c.actual_r0() for c in cascades]
 
     print("  R0 summary statistics:")
@@ -301,9 +192,6 @@ def main() -> None:
     for label, n in bin_counts.items():
         print(f"    {label:<15}  n={n}")
 
-    _plot_r0_distribution(r0_per_cascade, OUT_DIR)
-
-    # --- Accuracy by R0 bin -------------------------------------------------
     print(f"\nRunning {len(SEEDS)}-seed cross-validation ...")
 
     X, y, index, feature_names = build_feature_matrix(cascades)
@@ -320,7 +208,34 @@ def main() -> None:
 
     avg_metrics = _aggregate(all_seed_metrics)
     _print_results(avg_metrics, bin_counts)
-    _plot_accuracy_by_r0(avg_metrics, OUT_DIR)
+
+    # save to JSON
+    json_avg = {}
+    for label, methods in avg_metrics.items():
+        json_avg[label] = {}
+        for method, m in methods.items():
+            json_avg[label][method] = {
+                "top_1": float(m["top_k"][1]),
+                "top_3": float(m["top_k"][3]),
+                "top_1_std": float(m["top_k_std"][1]),
+                "top_3_std": float(m["top_k_std"][3]),
+            }
+
+    json_data = {
+        "target_size": TARGET_SIZE,
+        "n_seeds": len(SEEDS),
+        "r0_labels": R0_LABELS,
+        "method_labels": METHOD_LABELS,
+        "method_order": METHOD_ORDER,
+        "r0_values": [float(v) for v in r0_per_cascade],
+        "bin_counts": bin_counts,
+        "avg_metrics": json_avg,
+    }
+
+    out_path = DATA_DIR / "r0_analysis_falsenews.json"
+    with open(out_path, "w") as f:
+        json.dump(json_data, f, indent=2)
+    print(f"\nSaved metrics -> {out_path}")
 
 
 if __name__ == "__main__":

@@ -2,11 +2,13 @@
 """
 Test pre-trained RF models (IC on BA/ER) against real FalseNews cascades.
 Compares to centrality baselines and random. No training here, just eval.
+Saves metrics to JSON for separate plotting.
 
-Usage: python validation/validate_existing_models.py
+Usage: python validation/truefalsevalidation/validate_existing_models.py
 """
 from __future__ import annotations
 
+import json
 import sys
 import random
 from collections import defaultdict
@@ -15,9 +17,6 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_REPO_ROOT))
 
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import numpy as np
 import joblib
 
@@ -32,7 +31,7 @@ MODEL_PATHS = {
     "RF (IC-BA)": _REPO_ROOT / "results/models/ic_ba/rf_model_size25.pkl",
     "RF (IC-ER)": _REPO_ROOT / "results/models/ic_er/rf_model_size25.pkl",
 }
-OUT_DIR = _REPO_ROOT / "validation/truefalsevalidation/figures"
+DATA_DIR = _REPO_ROOT / "validation/truefalsevalidation/data"
 
 METHOD_LABELS = {
     "RF (IC-BA)":  "RF (trained IC-BA)",
@@ -57,30 +56,27 @@ def _evaluate_random(results, seed=42):
 
 
 def main() -> None:
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     cascades, metadata = load_falsenews_cascades(target_size=TARGET_SIZE)
     print(f"\nEvaluating on {len(cascades)} FalseNews cascades "
           f"(size={TARGET_SIZE})\n")
 
-    # load saved models
     models = {}
     for name, path in MODEL_PATHS.items():
         if path.exists():
             models[name] = joblib.load(path)
             print(f"  Loaded model: {name}  ({path})")
         else:
-            print(f"  WARNING: model not found — {path}")
+            print(f"  WARNING: model not found -- {path}")
 
     metrics: dict[str, dict] = {}
 
-    # rank with each pre-trained RF
     for name, model in models.items():
         print(f"\n  Ranking cascades with {name} ...")
         rankings = [model.rank_nodes(c) for c in cascades]
         metrics[name] = evaluate_ranker(cascades, rankings, ks=[1, 3])
 
-    # centrality baselines
     print("\n  Ranking cascades with baselines ...")
     baseline_cols: dict[str, list] = defaultdict(list)
     for c in cascades:
@@ -110,37 +106,26 @@ def main() -> None:
                   f"{m['mean_distance']:>10.2f}")
     print("=" * 80)
 
-    _plot_accuracy(metrics, len(cascades))
+    # save to JSON
+    json_data = {
+        "n_cascades": len(cascades),
+        "target_size": TARGET_SIZE,
+        "method_labels": METHOD_LABELS,
+        "method_order": METHOD_ORDER,
+        "metrics": {},
+    }
+    for method, m in metrics.items():
+        json_data["metrics"][method] = {
+            "top_1": float(m["top_k"][1]),
+            "top_3": float(m["top_k"][3]),
+            "mrr": float(m["mrr"]),
+            "mean_distance": float(m["mean_distance"]),
+        }
 
-
-def _plot_accuracy(metrics: dict, n_cascades: int) -> None:
-    plt.style.use("default")
-    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
-
-    methods_present = [m for m in METHOD_ORDER if m in metrics]
-    x = np.arange(len(methods_present))
-
-    for ax, k, title in zip(axes, [1, 3], [
-        f"top-1 accuracy — existing models on FalseNews ($n={n_cascades}$)",
-        f"top-3 accuracy — existing models on FalseNews ($n={n_cascades}$)",
-    ]):
-        vals = [100 * metrics[m]["top_k"][k] for m in methods_present]
-        for xi, val in enumerate(vals):
-            ax.bar(xi, val, facecolor="white", edgecolor="black", linewidth=0.5)
-        ax.set_xticks(x)
-        ax.set_xticklabels(
-            [METHOD_LABELS[m] for m in methods_present],
-            rotation=30, ha="right", fontsize=9,
-        )
-        ax.set_ylabel(f"top-{k} accuracy (%)")
-        ax.set_title(title, fontsize=10)
-        ax.set_ylim(0, 105)
-
-    plt.tight_layout()
-    out_file = OUT_DIR / "existing_models_on_falsenews.png"
-    fig.savefig(out_file, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    print(f"\nSaved plot -> {out_file}")
+    out_path = DATA_DIR / "validate_existing_models.json"
+    with open(out_path, "w") as f:
+        json.dump(json_data, f, indent=2)
+    print(f"\nSaved metrics -> {out_path}")
 
 
 if __name__ == "__main__":
