@@ -223,3 +223,4 @@ results/ablation_results_hpc.txt
 scripts/experiments/run_all_experiments.bat
 rumdect/
 data/outbreak_trees/
+scripts/experiments/run_ablation_studies.bat
