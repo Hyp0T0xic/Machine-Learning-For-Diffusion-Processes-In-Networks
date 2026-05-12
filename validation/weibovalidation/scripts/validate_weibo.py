@@ -24,7 +24,7 @@ from src.baselines.centrality import jordan_center, degree_rank
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-WEIBO_DIR        = _REPO_ROOT / "rumdect" / "Weibo"
+WEIBO_DIR        = _REPO_ROOT / "data" / "rumdect" / "rumdect" / "Weibo"
 MODELS_DIR       = _REPO_ROOT / "results" / "models"
 DATA_DIR         = _REPO_ROOT / "validation" / "weibovalidation" / "data"
 

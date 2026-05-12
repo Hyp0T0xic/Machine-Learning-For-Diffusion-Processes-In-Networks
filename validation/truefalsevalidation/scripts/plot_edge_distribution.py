@@ -17,6 +17,8 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 sys.path.insert(0, str(_REPO_ROOT))
 
+from src.visualization.theme import ACCENT_COLORS
+
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -72,12 +74,13 @@ def plot(stats: pd.DataFrame, out_dir: Path) -> None:
     fig, axes = plt.subplots(2, 2, figsize=(12, 8))
     fig.suptitle("Edge count distribution per cascade — FalseNews dataset", fontsize=13)
 
-    # different gray shades to distinguish veracity groups in b&w
+    # distinct fills from shared paper palette (indices stable for legend consistency)
+    C = ACCENT_COLORS
     plot_order = [
-        ("ALL",   "#A3A1D8"),
-        ("TRUE",  "#4DB6AC"),
-        ("FALSE", "#D99685"),
-        ("MIXED", "#C0A064"),
+        ("ALL",   C[6]),
+        ("TRUE",  C[2]),
+        ("FALSE", C[0]),
+        ("MIXED", C[4]),
     ]
 
     for ax, (label, color) in zip(axes.flat, plot_order):

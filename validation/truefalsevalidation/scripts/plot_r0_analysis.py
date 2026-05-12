@@ -10,21 +10,21 @@ Usage: python validation/truefalsevalidation/plot_r0_analysis.py
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+sys.path.insert(0, str(_REPO_ROOT))
+
+from src.visualization.theme import ACCENT_COLORS
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-_REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
-DATA_DIR   = _REPO_ROOT / "validation/truefalsevalidation/data"
-OUT_DIR    = _REPO_ROOT / "validation/truefalsevalidation/figures"
-
-COLORS = [
-    "#D99685", "#E38EA0", "#4DB6AC", "#9CB067", "#C0A064",
-    "#7FB382", "#A3A1D8", "#DA92B7", "#C594D1", "#56B4BE",
-]
+DATA_DIR = _REPO_ROOT / "validation/truefalsevalidation/data"
+OUT_DIR  = _REPO_ROOT / "validation/truefalsevalidation/figures"
 
 R0_BINS = [(0.0, 0.75), (0.75, 1.5), (1.5, 2.5), (2.5, 4.0), (4.0, float("inf"))]
 
@@ -45,7 +45,7 @@ def _plot_r0_distribution(data: dict) -> None:
 
     x    = np.arange(len(bin_labels))
     bars = ax.bar(x, counts, width=0.6,
-                  color=COLORS[:len(bin_labels)], edgecolor="black", linewidth=0.5)
+                  color=ACCENT_COLORS[:len(bin_labels)], edgecolor="black", linewidth=0.5)
 
     total = len(r0_values)
     for bar, count in zip(bars, counts):
@@ -103,7 +103,7 @@ def _plot_accuracy_by_r0(data: dict) -> None:
             ax.bar(
                 x + offsets[i], vals, bar_w,
                 label=labels[method],
-                facecolor=COLORS[i % len(COLORS)],
+                facecolor=ACCENT_COLORS[i % len(ACCENT_COLORS)],
                 edgecolor="black", linewidth=0.5,
             )
             for xi, val in enumerate(vals):
