@@ -221,3 +221,5 @@ mlruns.db
 mlruns/
 results/ablation_results_hpc.txt
 scripts/experiments/run_all_experiments.bat
+rumdect/
+data/outbreak_trees/
