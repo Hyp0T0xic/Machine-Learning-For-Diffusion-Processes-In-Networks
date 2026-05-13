@@ -1,16 +1,4 @@
-"""
-src.visualization.cascades
-==========================
-Hierarchical cascade-tree visualizations.
-
-Shows infection flow from the source (bottom) upward, with nodes coloured
-by infection time and sized by out-degree in the cascade tree.
-
-Functions
----------
-plot_cascade_tree     : Single cascade as a hierarchical directed tree.
-plot_comparison_grid  : Side-by-side cascade trees across multiple networks.
-"""
+"""hierarchical cascade-tree plots: source at the bottom, infection time as colour, out-degree as size"""
 
 from __future__ import annotations
 
@@ -26,7 +14,7 @@ import numpy as np
 from src.data.cascade import CascadeResult
 
 
-# ── Layout helpers ──────────────────────────────────────────────────────────
+# layout helpers
 
 
 def _bfs_hierarchy_layout(
@@ -71,7 +59,7 @@ def _hierarchy_layout(tree: nx.DiGraph, source: int) -> dict:
         return _bfs_hierarchy_layout(tree, source)
 
 
-# ── Public API ──────────────────────────────────────────────────────────────
+# public api
 
 
 def plot_cascade_tree(

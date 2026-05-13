@@ -1,9 +1,5 @@
 #!/usr/bin/env python
-"""
-validation/weibovalidation/scripts/plot_weibo_cascades.py
-Show example cascades for real Weibo diffusion trees.
-Updated to match the "Natural Range" selection (cascades near the mean).
-"""
+"""draw 5 example weibo repost cascades sampled across the natural-range size window"""
 from __future__ import annotations
 
 import sys
@@ -16,20 +12,17 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-# Import the loader from the natural range validation script
 from validation.weibovalidation.scripts.validate_weibo_natural_range import select_median_centred_cascades
 from src.visualization.cascades import plot_cascade_tree
 
 N_EXAMPLES = 5
-# Use the same config as the natural range experiment
 MIN_SIZE = 25
 N_TOTAL_FOR_SELECTION = 101
 
+
 def main() -> None:
-    # 1. Load cascades using the same logic as the Natural Range experiment
-    print(f"Loading Weibo cascades (Natural Range logic)...")
-    
-    # We take the 101 cascades nearest to the mean (per updated script)
+    # reuse the same median-centred 101 selection the validation script uses
+    print("loading weibo cascades (natural-range selection) ...")
     cascades, pop_info = select_median_centred_cascades(
         min_size=MIN_SIZE,
         n_around=N_TOTAL_FOR_SELECTION
@@ -39,10 +32,9 @@ def main() -> None:
         print("No cascades found or loaded.")
         return
 
-    # Sort cascades by size
     cascades.sort(key=lambda c: c.size)
-    
-    # Pick 5 evenly spaced examples from the 101 selected
+
+    # pick 5 evenly spaced examples spanning the size range
     if len(cascades) > N_EXAMPLES:
         indices = [int(i) for i in range(0, len(cascades), len(cascades) // N_EXAMPLES)][:N_EXAMPLES]
         selected_cascades = [cascades[i] for i in indices]

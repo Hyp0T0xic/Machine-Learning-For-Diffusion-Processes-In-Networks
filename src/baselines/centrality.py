@@ -1,20 +1,4 @@
-"""
-src.baselines.centrality
-========================
-Classical graph-theory baselines for source detection.
-
-These methods predict the source without any ML training — they rank nodes
-by a graph-theoretic heuristic on the undirected observed cascade.
-
-Methods
--------
-jordan_center     : Predict the Jordan center (minimises eccentricity).
-                    Known to perform well for tree-like cascades [Shah 2011].
-degree_rank       : Predict the highest-degree node.
-closeness_rank    : Predict the node with highest closeness centrality.
-betweenness_rank  : Predict the node with highest betweenness centrality.
-predict_all       : Run all baselines and return ranked node lists.
-"""
+"""training-free baselines: rank infected nodes by jordan / degree / closeness / betweenness centrality"""
 from __future__ import annotations
 
 import random

@@ -1,15 +1,4 @@
-"""
-src.visualization.networks
-==========================
-Network comparison visualizations.
-
-Creates a 1×3 subplot figure with nodes coloured by degree centrality
-and sized proportionally to their degree, on a shared colour scale.
-
-Functions
----------
-visualize_networks : Side-by-side plot of ER, BA, and Complete graphs.
-"""
+"""1×3 panel of er / ba / complete networks side-by-side, coloured + sized by degree"""
 
 from __future__ import annotations
 

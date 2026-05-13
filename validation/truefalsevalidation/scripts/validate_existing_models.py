@@ -1,11 +1,5 @@
 #!/usr/bin/env python
-"""
-Test pre-trained RF models (IC on BA/ER) against real FalseNews cascades.
-Compares to centrality baselines and random. No training here, just eval.
-Saves metrics and hop distribution to JSON for separate plotting.
-
-Usage: python validation/truefalsevalidation/scripts/validate_existing_models.py
-"""
+"""evaluate pre-trained ic-ba and ic-er rfs on real falsenews cascades, dump metrics + hop dist to json"""
 from __future__ import annotations
 
 import json

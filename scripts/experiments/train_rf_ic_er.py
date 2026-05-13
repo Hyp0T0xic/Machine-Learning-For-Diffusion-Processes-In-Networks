@@ -1,17 +1,5 @@
 #!/usr/bin/env python
-"""
-scripts/experiments/train_rf_ic_er.py
-=====================================
-Train a Random Forest on node structural features to predict Patient Zero
-in IC cascades on 200-node Erdős–Rényi graphs.
-
-Runs across MULTIPLE network seeds, averaging the results
-for statistical robustness.
-
-Usage
------
-    python -m scripts.experiments.train_rf_ic_er
-"""
+"""train rf on ic-er cascades across 5 seeds, save rf-vs-baselines bars and feature importances"""
 from __future__ import annotations
 
 import random
@@ -34,11 +22,12 @@ from src.features.extract import build_feature_matrix
 from src.models.random_forest import SourceRandomForest
 from src.baselines.centrality import predict_all
 from src.evaluation.metrics import evaluate_ranker
+from src.visualization.theme import METHOD_COLORS, ACCENT_COLORS
 
-# -- Configuration -----------------------------------------------------------
+# config
 
 N_NODES       = 200
-ER_P          = 6 / (N_NODES - 1)   # match BA avg degree ≈ 6
+ER_P          = 6 / (N_NODES - 1)   # picks p to match the ba avg degree (~6)
 R0_VALUES     = [0.5, 1.0, 2.0, 3.0, 5.0]
 CASCADE_SIZES = [25]
 N_TARGET      = 1000
@@ -108,21 +97,18 @@ def evaluate_random_baseline(results: list[CascadeResult], seed: int = 42) -> di
 
 
 def run_single_seed(seed: int, cascade_size: int) -> tuple[dict, dict, object]:
-    """Run the full pipeline for one seed and cascade size."""
-    # 1. Generate Data
+    """full pipeline for one seed: generate, extract, split, train, evaluate"""
     cascades, r0s = generate_data(seed, cascade_size)
 
-    # 2. Extract Features
     X, y, index, feature_names = build_feature_matrix(cascades)
     groups = [idx[0] for idx in index]
 
-    # 3. Train/Test Split
+    # group by cascade so no cascade's nodes leak across the split
     sgkf = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=seed)
     train_idx, test_idx = next(sgkf.split(X, y, groups=groups))
 
     X_train, y_train = X[train_idx], y[train_idx]
 
-    # Train model
     rf = SourceRandomForest(
         n_estimators=500,
         max_depth=10,
@@ -133,12 +119,10 @@ def run_single_seed(seed: int, cascade_size: int) -> tuple[dict, dict, object]:
     )
     rf.fit(X_train, y_train, feature_names)
 
-    # Setup test set cascades
     test_cascade_indices = sorted(set(groups[i] for i in test_idx))
     test_cascades = [cascades[i] for i in test_cascade_indices]
     test_r0s = [r0s[i] for i in test_cascade_indices]
 
-    # 4. Evaluate all methods
     metrics_by_r0: dict[float, dict[str, dict]] = defaultdict(dict)
 
     for eval_r0 in R0_VALUES:
@@ -148,11 +132,9 @@ def run_single_seed(seed: int, cascade_size: int) -> tuple[dict, dict, object]:
 
         subset_cascades = [test_cascades[i] for i in r0_indices]
 
-        # Random Forest Rankings
         rf_rankings = [rf.rank_nodes(c) for c in subset_cascades]
         metrics_by_r0[eval_r0]["random_forest"] = evaluate_ranker(subset_cascades, rf_rankings, ks=[1, 3])
 
-        # Baselines
         cols = defaultdict(list)
         for c in subset_cascades:
             preds = predict_all(c)
@@ -161,7 +143,6 @@ def run_single_seed(seed: int, cascade_size: int) -> tuple[dict, dict, object]:
         for m_name in cols:
             metrics_by_r0[eval_r0][m_name] = evaluate_ranker(subset_cascades, cols[m_name], ks=[1, 3])
 
-        # Random
         metrics_by_r0[eval_r0]["random"] = evaluate_random_baseline(subset_cascades, seed=seed)
 
     return dict(metrics_by_r0), rf.feature_importances, rf
@@ -196,13 +177,10 @@ def aggregate_importances(all_seed_importances: list[dict]) -> dict:
 
 
 def print_results(avg_metrics: dict, cascade_size: int) -> None:
-    """Print averaged results table."""
-    print(f"\n{'='*105}")
-    print(f"  ER + IC | CASCADE SIZE = {cascade_size} | AVERAGED OVER {len(SEEDS)} SEEDS")
-    print(f"{'='*105}")
-    print(f"{'Method':<18}  " + "   ".join(f"R0={r:>3.1f}" for r in R0_VALUES))
-    print(" " * 18 + "  " + "  ".join("Top1   Top3 " for _ in R0_VALUES))
-    print("-" * 105)
+    """print the per-method top-1/top-3 table averaged across seeds"""
+    print(f"\ner + ic, cascade size = {cascade_size}, averaged over {len(SEEDS)} seeds")
+    print(f"{'method':<18}  " + "   ".join(f"r0={r:>3.1f}" for r in R0_VALUES))
+    print(" " * 18 + "  " + "  ".join("top1   top3 " for _ in R0_VALUES))
 
     for method in METHOD_ORDER:
         row = f"{METHOD_LABELS[method]:<18}  "
@@ -215,22 +193,19 @@ def print_results(avg_metrics: dict, cascade_size: int) -> None:
             else:
                 row += "   -      -   "
         print(row)
-    print("=" * 105)
 
 
 def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     
-    # Ensure MLflow logs to the project root database regardless of where script is run
+    # always point mlflow at the project-root db, no matter the cwd
     project_root = Path(__file__).resolve().parent.parent.parent
     db_path = project_root / "mlruns.db"
     mlflow.set_tracking_uri(f"sqlite:///{db_path}")
     mlflow.set_experiment("Random_Forest_ER_IC")
 
     for cascade_size in CASCADE_SIZES:
-        print(f"\n\n{'#'*80}")
-        print(f"  RUNNING ER + IC | CASCADE SIZE = {cascade_size}")
-        print(f"{'#'*80}")
+        print(f"\ner + ic, cascade size = {cascade_size}")
 
         all_seed_metrics: list[dict] = []
         all_seed_importances: list[dict] = []
@@ -272,7 +247,7 @@ def main() -> None:
             if acc_plot: mlflow.log_artifact(str(acc_plot))
             if imp_plot: mlflow.log_artifact(str(imp_plot))
 
-            # Save the first seed's model as the representative model
+            # first seed's model is the one we ship to downstream validation scripts
             model_dir = Path("results/models/ic_er")
             model_dir.mkdir(parents=True, exist_ok=True)
             model_path = model_dir / f"rf_model_size{cascade_size}.pkl"
@@ -282,16 +257,18 @@ def main() -> None:
 
 
 def _plot_accuracy(avg_metrics: dict, cascade_size: int) -> Path:
+    """rf vs baselines top-1/top-3 bar chart, one panel per k"""
+    plt.style.use("default")
     fig, axes = plt.subplots(2, 1, figsize=(12, 10))
-    fig.patch.set_facecolor("#0d0d1a")
 
+    # "random_forest" here is the ic-er model so it picks up the er teal
     palette = {
-        "random_forest": "#ffb703",
-        "jordan":       "#e63946",
-        "closeness":    "#f4a261",
-        "betweenness":  "#2ec4b6",
-        "degree":       "#a8dadc",
-        "random":       "#888888",
+        "random_forest": METHOD_COLORS["RF (IC-ER)"],
+        "jordan":        METHOD_COLORS["jordan"],
+        "closeness":     METHOD_COLORS["closeness"],
+        "betweenness":   METHOD_COLORS["betweenness"],
+        "degree":        METHOD_COLORS["degree"],
+        "random":        METHOD_COLORS["random"],
     }
 
     r0_list = [r for r in R0_VALUES if r in avg_metrics]
@@ -304,7 +281,6 @@ def _plot_accuracy(avg_metrics: dict, cascade_size: int) -> Path:
     for ax, k_measure, title in zip(axes, [1, 3],
             [f"Top-1 Accuracy — IC on ER (Mean over {len(SEEDS)} seeds, size={cascade_size})",
              f"Top-3 Accuracy — IC on ER (Mean over {len(SEEDS)} seeds, size={cascade_size})"]):
-        ax.set_facecolor("#1a1a2e")
         for i, method in enumerate(METHOD_ORDER):
             vals = []
             errs = []
@@ -319,51 +295,49 @@ def _plot_accuracy(avg_metrics: dict, cascade_size: int) -> Path:
             ax.bar(x + offsets[i], vals, bar_w, yerr=errs,
                    label=METHOD_LABELS[method], color=palette[method],
                    edgecolor="black", linewidth=0.5, capsize=2,
-                   error_kw={"ecolor": "white", "alpha": 0.6})
+                   error_kw={"ecolor": "black", "alpha": 0.6})
 
         ax.set_xticks(x)
-        ax.set_xticklabels([f"R0={r}" for r in r0_list], color="lightgray")
-        ax.set_ylabel(f"Top-{k_measure} Accuracy (%)", color="lightgray")
-        ax.set_title(title, color="white", fontweight="bold")
+        ax.set_xticklabels([f"R0={r}" for r in r0_list])
+        ax.set_ylabel(f"Top-{k_measure} Accuracy (%)")
+        ax.set_title(title, fontweight="bold")
         ax.set_ylim(0, 105)
-        ax.tick_params(colors="lightgray")
+        ax.grid(True, linestyle="--", alpha=0.5, axis="y")
         if k_measure == 1:
-            ax.legend(fontsize=9, facecolor="#222", edgecolor="#444", labelcolor="white",
-                      loc="upper left", bbox_to_anchor=(1.02, 1))
-        for sp in ax.spines.values(): sp.set_edgecolor("#444")
+            ax.legend(fontsize=9, loc="upper left", bbox_to_anchor=(1.02, 1))
 
     plt.tight_layout()
     out_file = OUT_DIR / f"rf_vs_baselines_er_ic_size{cascade_size}.png"
-    fig.savefig(out_file, dpi=150, facecolor=fig.get_facecolor(), bbox_inches="tight")
+    fig.savefig(out_file, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"\nSaved accuracy plot   -> {out_file}")
     return out_file
 
 
 def _plot_feature_importances(avg_importances: dict, cascade_size: int) -> Path | None:
+    """horizontal bar chart of mean gini importance per feature"""
     if not avg_importances:
         return None
 
     sorted_imp = sorted(avg_importances.items(), key=lambda x: x[1])
     features, scores = zip(*sorted_imp)
 
+    plt.style.use("default")
     fig, ax = plt.subplots(figsize=(8, 6))
-    fig.patch.set_facecolor("#0d0d1a")
-    ax.set_facecolor("#1a1a2e")
 
     y_pos = np.arange(len(features))
-    ax.barh(y_pos, scores, align='center', color="#2ec4b6", edgecolor="black")
+    ax.barh(y_pos, scores, align='center', color=METHOD_COLORS["RF (IC-ER)"],
+            edgecolor="black")
     ax.set_yticks(y_pos)
-    ax.set_yticklabels(features, color="lightgray")
-    ax.set_xlabel(f"Mean Decrease in Impurity (Gini, avg over {len(SEEDS)} seeds)", color="lightgray")
+    ax.set_yticklabels(features)
+    ax.set_xlabel(f"Mean Decrease in Impurity (Gini, avg over {len(SEEDS)} seeds)")
     ax.set_title(f"Random Forest — Feature Importances (IC on ER, size={cascade_size})",
-                 color="white", fontweight="bold")
-    ax.tick_params(colors="lightgray")
-    for sp in ax.spines.values(): sp.set_edgecolor("#444")
+                 fontweight="bold")
+    ax.grid(True, linestyle="--", alpha=0.5, axis="x")
 
     plt.tight_layout()
     out_file = OUT_DIR / f"rf_feature_importance_er_ic_size{cascade_size}.png"
-    fig.savefig(out_file, dpi=150, facecolor=fig.get_facecolor())
+    fig.savefig(out_file, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved importance plot -> {out_file}")
     return out_file

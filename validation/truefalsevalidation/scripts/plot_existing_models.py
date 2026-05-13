@@ -18,7 +18,7 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 sys.path.insert(0, str(_REPO_ROOT))
 
-from src.visualization.theme import ACCENT_COLORS
+from src.visualization.theme import ACCENT_COLORS, METHOD_COLORS as _METHOD_COLORS
 
 import matplotlib
 matplotlib.use("Agg")
@@ -31,16 +31,8 @@ OUT_DIR  = _REPO_ROOT / "validation/truefalsevalidation/figures"
 HOP_BINS  = ["0", "1", "2", "3", "4"]
 HOP_LABEL = ["0", "1", "2", "3", "4+"]
 
-# Consistent color mapping
-METHOD_COLORS = {
-    "RF (IC-BA)":    ACCENT_COLORS[5],  # Green
-    "RF (IC-ER)":    ACCENT_COLORS[2],  # Teal
-    "jordan":        ACCENT_COLORS[0],  # Salmon
-    "closeness":     ACCENT_COLORS[1],  # Pink
-    "degree":        ACCENT_COLORS[4],  # Gold
-    "random":        ACCENT_COLORS[6],  # Periwinkle
-    "betweenness":   ACCENT_COLORS[8],  # Purple
-}
+# local handle for the canonical project palette
+METHOD_COLORS = _METHOD_COLORS
 
 
 def _accuracy_panel(ax, present, metrics, labels, mean_key, std_key, title):

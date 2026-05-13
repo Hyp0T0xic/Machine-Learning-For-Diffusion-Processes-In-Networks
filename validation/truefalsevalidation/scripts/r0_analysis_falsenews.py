@@ -1,12 +1,5 @@
 #!/usr/bin/env python
-"""
-Analyse the empirical R0 distribution of the FalseNews validation cascades,
-then compare source-identification accuracy across R0 bins for the
-FalseNews-trained RF and all centrality baselines.
-Saves results to JSON for separate plotting.
-
-Usage: python validation/truefalsevalidation/r0_analysis_falsenews.py
-"""
+"""bin falsenews cascades by empirical r0, then evaluate rf + baselines per bin, save metrics to json"""
 from __future__ import annotations
 
 import json

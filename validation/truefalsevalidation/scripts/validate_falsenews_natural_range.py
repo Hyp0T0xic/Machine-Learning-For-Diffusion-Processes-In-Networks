@@ -1,17 +1,5 @@
 #!/usr/bin/env python
-"""
-Evaluate source-identification methods on FalseNews cascades in their
-natural size range [42, 320] nodes (IQR of the study pool), without
-any BFS truncation applied.
-
-Reads:  FalseNews raw CSV (via load_falsenews_cascades)
-        results/models/ic_ba/rf_model_size25.pkl
-        results/models/ic_er/rf_model_size25.pkl
-        validation/truefalsevalidation/models/rf_model_falsenews_size25.pkl
-Writes: validation/truefalsevalidation/data/validate_falsenews_natural_range.json
-
-Usage: python validation/truefalsevalidation/scripts/validate_falsenews_natural_range.py
-"""
+"""evaluate rf models on falsenews cascades in the iqr size range [42, 320] (untruncated), dump metrics to json"""
 from __future__ import annotations
 
 import json

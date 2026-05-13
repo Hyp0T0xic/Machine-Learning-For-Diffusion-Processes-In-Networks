@@ -1,10 +1,5 @@
 #!/usr/bin/env python
-"""
-Plot IC on BA synthetic testset evaluation results as grouped bar charts across R0.
-Uses consistent color mapping: RF variants are greener.
-
-Usage: python scripts/experiments/plot_metrics_ic_ba_bars.py
-"""
+"""same data as plot_metrics_ic_ba but as grouped bars per r0 bin"""
 from __future__ import annotations
 
 import json
@@ -14,7 +9,7 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_REPO_ROOT))
 
-from src.visualization.theme import ACCENT_COLORS
+from src.visualization.theme import ACCENT_COLORS, METHOD_COLORS
 
 import matplotlib
 matplotlib.use("Agg")
@@ -23,15 +18,6 @@ import numpy as np
 
 JSON_PATH = _REPO_ROOT / "results/metrics/testset_evaluation_ic_ba.json"
 OUT_DIR   = _REPO_ROOT / "results/figures/ml_evaluation"
-
-# Consistent color mapping
-METHOD_COLORS = {
-    "random_forest": ACCENT_COLORS[5],  # Green
-    "jordan":        ACCENT_COLORS[0],  # Salmon
-    "closeness":     ACCENT_COLORS[1],  # Pink
-    "degree":        ACCENT_COLORS[4],  # Gold
-    "random":        ACCENT_COLORS[6],  # Periwinkle
-}
 
 def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)

@@ -1,11 +1,5 @@
 #!/usr/bin/env python
-"""
-Train RF on FalseNews cascades and compare to IC-trained models + baselines.
-Feature matrix built once, only the train/test split varies across seeds.
-Saves metrics + feature importances to JSON for separate plotting.
-
-Usage: python validation/truefalsevalidation/train_rf_falsenews.py
-"""
+"""train a fresh rf on falsenews cascades, compare to ic-ba/er + baselines, dump metrics + importances to json"""
 from __future__ import annotations
 
 import json

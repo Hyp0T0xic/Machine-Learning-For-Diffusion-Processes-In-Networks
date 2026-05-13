@@ -1,25 +1,5 @@
-"""
-Figure 1 — Cascade Size Distribution vs. R₀
-
-Runs N_SIMS=200 simulations of IC on ER (⟨k⟩=6) and BA (m=3)
-across a grid of R₀ values (0.5 to 4.0 in steps of 0.25). Records final
-cascade size as a fraction of N for each run.
-
-Produces a 1×2 grid of violin plots:
-  columns = topology (ER / BA)
-
-Horizontal shaded bands mark the "too small" (<5% of N, structurally trivial)
-and "too large" (>90% of N, saturated/washed-out) regions. Vertical dashed
-lines mark the chosen operating R₀ bounds.
-
-Defends: R₀ sweep range, max_size cutoff, and the identifiability window.
-BA saturation at lower R₀ than ER is a direct empirical demonstration of the
-Pastor-Satorras & Vespignani zero-threshold result on scale-free networks.
-
-Usage
------
-    python -m scripts.experiments.fig1_cascade_size_distribution
-"""
+"""violin plot of ic cascade size / n vs r0 on er and ba, bands mark the trivial (<5%) and saturated (>90%) zones.
+ba saturates earlier than er — pastor-satorras & vespignani zero-threshold for scale-free networks."""
 from __future__ import annotations
 
 import random

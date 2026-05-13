@@ -1,20 +1,4 @@
-"""
-src.data.simulate
-=================
-Experiment runner for batch cascade simulation.
-
-Provides helpers to select source nodes, run a diffusion model from multiple
-sources across a range of parameters, compute per-cascade statistics, and
-serialise/deserialise results to JSON.
-
-Functions
----------
-select_sources       : Sample seed nodes from a contact network.
-run_experiment       : Run a model from each source; return CascadeResult list.
-compute_cascade_stats: Summarise one cascade (size, depth, R₀, coverage…).
-save_cascades        : Serialise a list of CascadeResults to JSON.
-load_cascades        : Deserialise cascades from a JSON file.
-"""
+"""batch cascade simulation runner + per-cascade stats + json (de)serialisation"""
 
 from __future__ import annotations
 

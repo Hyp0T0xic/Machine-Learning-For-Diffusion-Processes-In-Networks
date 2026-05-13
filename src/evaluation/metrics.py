@@ -1,24 +1,4 @@
-"""
-src.evaluation.metrics
-======================
-Performance metrics for source-detection experiments.
-
-The key metrics for this task are:
-
-* **Top-k accuracy** — the true source appears in the top-k predicted nodes.
-* **Distance to true source** — hop distance between the predicted node
-  (rank-1) and the true source in the undirected observed graph. Captures
-  "how far off" a wrong prediction is.
-* **Mean Reciprocal Rank (MRR)** — 1/rank of the true source, averaged over
-  cascades. Measures ranking quality.
-
-Functions
----------
-top_k_accuracy       : Fraction of cascades where source is in top-k.
-distance_to_source   : Hop distance between rank-1 prediction and true source.
-mean_reciprocal_rank : MRR over a list of ranking results.
-evaluate_ranker      : Full evaluation of one ranking function.
-"""
+"""source-detection metrics: top-k accuracy, mrr, and hop distance from rank-1 prediction to the true source"""
 from __future__ import annotations
 
 import networkx as nx

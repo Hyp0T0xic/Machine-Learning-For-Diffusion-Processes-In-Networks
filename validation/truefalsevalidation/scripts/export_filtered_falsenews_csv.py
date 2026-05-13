@@ -1,24 +1,6 @@
 #!/usr/bin/env python
-"""
-Export a smaller FalseNews CSV containing only cascades (and rows) that pass
-the same structural filter as ``load_falsenews_cascades`` (root tweet present,
-≥ min_size nodes reachable from root).
-
-Two row modes:
-
-- ``reachable`` (default): keep every row whose ``tid`` lies in the rooted
-  reachable subtree. Use this for R₀ / size statistics on real cascades.
-- ``subgraph``: keep only rows for the first ``target_size`` nodes in BFS order
-  from the root — matches the exact subgraph used by the current RF pipeline.
-
-Does **not** delete the original file; writes a new CSV next to the input by
-default. Re-point loaders with ``csv_path=`` or copy the path into your config.
-
-Usage (from repo root)::
-
-    python -u validation/export_filtered_falsenews_csv.py
-    python -u validation/export_filtered_falsenews_csv.py --row-mode subgraph
-"""
+"""filter the falsenews csv down to cascades with a root and >= min_size reachable nodes.
+two row modes: 'reachable' keeps every row in the rooted subtree, 'subgraph' keeps only the bfs-first target_size."""
 from __future__ import annotations
 
 import argparse

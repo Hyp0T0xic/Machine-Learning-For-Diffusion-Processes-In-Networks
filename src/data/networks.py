@@ -1,24 +1,4 @@
-"""
-src.data.networks
-=================
-Generate, characterise, and persist the contact networks used as substrates
-for epidemic simulation.
-
-Three network types are supported:
-
-* **Erdős–Rényi (ER)**  — random graph G(n, p); uniform, baseline structure.
-* **Barabási–Albert (BA)** — preferential attachment; scale-free with hubs.
-* **Complete (K_n)**       — every node connected to every other; negative control.
-
-Functions
----------
-generate_er_network     : Create a connected ER random graph.
-generate_ba_network     : Create a BA preferential-attachment graph.
-generate_complete_graph : Create the complete graph K_n.
-generate_all_networks   : Convenience wrapper — returns all three.
-compute_network_stats   : Summary statistics (degree, diameter, clustering…).
-save_networks           : Persist graphs to GraphML files.
-"""
+"""generate er / ba / complete contact networks, compute stats, save to graphml"""
 
 from __future__ import annotations
 

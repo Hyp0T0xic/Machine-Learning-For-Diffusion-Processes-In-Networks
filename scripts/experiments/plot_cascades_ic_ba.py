@@ -1,9 +1,5 @@
 #!/usr/bin/env python
-"""
-scripts/experiments/plot_cascades_ic_ba.py
-Show example cascades for IC on BA across different R0 values.
-Updated to use a clean white background.
-"""
+"""grid of example ic-ba cascades, one row per r0 in {0.5, 1.0, 2.0, 3.0, 5.0}"""
 from __future__ import annotations
 
 import random

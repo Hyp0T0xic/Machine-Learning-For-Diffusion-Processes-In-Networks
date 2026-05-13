@@ -1,7 +1,7 @@
 """
 how does the number of runs needed to collect 1000 cascades of size >= 25
 change as r0 varies continuously? uses hit-rate estimation instead of
-actually collecting 1000 cascades -- way faster for subcritical r0 values.
+actually collecting 1000 cascades - way faster for subcritical r0 values.
 
 for each r0: run N_REPS independent estimates (different seeds) and average them.
 then estimated_total = 1000 / mean_hit_rate. y axis is linear, truncated at Y_CAP

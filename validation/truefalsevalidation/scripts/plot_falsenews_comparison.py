@@ -16,7 +16,7 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 sys.path.insert(0, str(_REPO_ROOT))
 
-from src.visualization.theme import ACCENT_COLORS
+from src.visualization.theme import ACCENT_COLORS, METHOD_COLORS
 
 import matplotlib
 matplotlib.use("Agg")
@@ -46,7 +46,11 @@ def _plot_comparison(data: dict) -> None:
     ]):
         vals = [100 * metrics[m][key] for m in present]
         for xi, val in enumerate(vals):
-            ax.bar(xi, val, facecolor=ACCENT_COLORS[xi % len(ACCENT_COLORS)],
+            m = present[xi]
+            color = METHOD_COLORS.get(
+                m, ACCENT_COLORS[xi % len(ACCENT_COLORS)]
+            )
+            ax.bar(xi, val, facecolor=color,
                    edgecolor="black", linewidth=0.5)
             ax.text(xi, val + 0.5, f"{val:.1f}%", ha="center", va="bottom", fontsize=8)
         ax.set_xticks(x)

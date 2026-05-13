@@ -1,15 +1,4 @@
-"""
-src.features.preprocess
-=======================
-Preprocessing: convert directed cascade observations to undirected graphs
-and validate tree structure before feature extraction.
-
-Functions (TODO)
------------
-to_undirected  : Drop edge directions from a CascadeResult's observed graph.
-validate_tree  : Assert the undirected cascade is a valid connected tree.
-filter_trivial : Remove cascades too small to be informative (size < min_size).
-"""
+"""drop edge directions on a cascade and filter out trivially small ones before feature extraction"""
 from __future__ import annotations
 
 import networkx as nx

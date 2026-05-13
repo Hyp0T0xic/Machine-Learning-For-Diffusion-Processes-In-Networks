@@ -16,7 +16,7 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 sys.path.insert(0, str(_REPO_ROOT))
 
-from src.visualization.theme import ACCENT_COLORS
+from src.visualization.theme import ACCENT_COLORS, METHOD_COLORS
 
 import matplotlib
 matplotlib.use("Agg")
@@ -100,10 +100,11 @@ def _plot_accuracy_by_r0(data: dict) -> None:
                 m = avg_metrics.get(label, {}).get(method)
                 vals.append(100 * m[key] if m else 0)
 
+            color = METHOD_COLORS.get(method, ACCENT_COLORS[i % len(ACCENT_COLORS)])
             ax.bar(
                 x + offsets[i], vals, bar_w,
                 label=labels[method],
-                facecolor=ACCENT_COLORS[i % len(ACCENT_COLORS)],
+                facecolor=color,
                 edgecolor="black", linewidth=0.5,
             )
             for xi, val in enumerate(vals):

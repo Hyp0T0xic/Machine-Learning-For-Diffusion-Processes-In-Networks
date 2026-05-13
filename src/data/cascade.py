@@ -1,21 +1,4 @@
-"""
-src.data.cascade
-================
-Core data structures and epidemic model implementations.
-
-Classes
--------
-CascadeResult       : Stores the outcome of one diffusion run (source,
-                      infection times, cascade edges, derived properties).
-IndependentCascade  : IC model — one-shot transmission with probability *p*.
-SIModel             : SI model — persistent transmission, no recovery.
-SIRModel            : SIR model — transmission + recovery with probability γ.
-
-Functions
----------
-r0_to_params : Map target R₀ to model-specific transmission parameters.
-create_model : Factory — return a model instance by name string.
-"""
+"""cascade dataclass + ic/si/sir model implementations, plus the r0→param mapping"""
 
 from __future__ import annotations
 
@@ -26,7 +9,7 @@ import networkx as nx
 import numpy as np
 
 
-# ── Data structure ───────────────────────────────────────────────────────────
+# data structure
 
 
 @dataclass
@@ -134,7 +117,7 @@ class CascadeResult:
         )
 
 
-# ── R₀ → parameter mapping ─────────────────────────────────────────────────
+# r0 → parameter mapping
 
 
 def r0_to_params(
@@ -179,7 +162,7 @@ def r0_to_params(
         raise ValueError(f"Unknown model: {model!r}. Choose from IC, SI, SIR.")
 
 
-# ── Model implementations ──────────────────────────────────────────────────
+# model implementations
 
 
 class IndependentCascade:
@@ -318,7 +301,7 @@ class SIRModel:
         )
 
 
-# ── Factory ─────────────────────────────────────────────────────────────────
+# factory
 
 
 def create_model(name: str, **params) -> IndependentCascade | SIModel | SIRModel:

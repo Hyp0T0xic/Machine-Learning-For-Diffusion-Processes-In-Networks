@@ -1,10 +1,4 @@
-"""
-Quick check for the "size >= 25" cutoff.
-
-For a few R0 values, simulate IC cascades on BA and ER graphs and count
-how many tries it takes to get a cascade of at least 25 nodes.
-Saves a small bar plot at the end.
-"""
+"""for each r0, count how many ic runs you need to land 1000 cascades of size >= 25 on ba/er, then bar-plot it"""
 from __future__ import annotations
 
 import sys

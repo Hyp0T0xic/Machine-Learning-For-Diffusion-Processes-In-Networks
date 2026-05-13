@@ -1,9 +1,5 @@
 #!/usr/bin/env python
-"""
-validation/outbreaksvalidation/scripts/plot_outbreak_trees_cascades.py
-Show example cascades for real biological transmission trees (OutbreakTrees).
-Updated to use a clean white background and 5-example layout.
-"""
+"""draw 5 example outbreak-tree cascades from the dataset"""
 from __future__ import annotations
 
 import sys
@@ -16,16 +12,15 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-# Import our custom loaders
 from validation.outbreaksvalidation.scripts.validate_outbreak_trees import load_all_trees
 from src.visualization.cascades import plot_cascade_tree
 
 N_EXAMPLES = 5
 
+
 def main() -> None:
-    # 1. Load cascades
-    print(f"Loading OutbreakTrees cascades...")
-    cascades = load_all_trees() 
+    print("loading outbreaktrees cascades ...")
+    cascades = load_all_trees()
     
     if not cascades:
         print("No cascades found or loaded.")

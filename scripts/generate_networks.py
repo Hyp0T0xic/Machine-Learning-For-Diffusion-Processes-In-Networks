@@ -1,14 +1,5 @@
 #!/usr/bin/env python
-"""
-scripts/generate_networks.py
-============================
-Entry point — generate, characterise, visualise, and save the three
-contact networks used for diffusion-cascade source detection.
-
-Usage
------
-    python scripts/generate_networks.py
-"""
+"""build the three contact networks, print stats, save as graphml, render the comparison figure"""
 from __future__ import annotations
 
 import matplotlib.pyplot as plt

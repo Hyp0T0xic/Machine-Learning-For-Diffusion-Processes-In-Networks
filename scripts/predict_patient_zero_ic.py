@@ -1,33 +1,5 @@
 #!/usr/bin/env python
-"""
-scripts/predict_patient_zero_ic.py
-====================================
-Evaluate source-identification (patient-zero prediction) accuracy of
-classical graph-theory baselines on IC cascades over a 20-node complete graph.
-
-Experiment design
------------------
-1. Build K_20.
-2. For each R₀ ∈ {0.5, 1.0, 2.0, 3.0, 5.0}:
-   - Run N_RUNS IC cascades, each from a RANDOM source node.
-   - For each cascade, apply every baseline to rank the infected nodes.
-   - Record whether the true source appears at rank 1 (top-1) or within the
-     top-3 (top-3) and the mean rank of the true source (lower = better).
-3. Report a table of Top-1 Acc / Top-3 Acc / Mean Rank per method × R₀.
-4. Save a visualisation.
-
-Baselines evaluated
--------------------
-jordan     : Jordan centre of the observed cascade (Shah 2011)
-closeness  : Closeness centrality
-betweenness: Betweenness centrality
-degree     : Degree centrality
-random     : Random guess (theoretical upper-bound for a random baseline)
-
-Usage
------
-    python -m scripts.predict_patient_zero_ic
-"""
+"""run centrality baselines + random on ic cascades over k20 across r0 and save a 4-panel figure"""
 from __future__ import annotations
 
 import random
@@ -43,12 +15,13 @@ import numpy as np
 
 from src.data.cascade import r0_to_params, IndependentCascade
 from src.baselines.centrality import predict_all
+from src.visualization.theme import METHOD_COLORS
 
-# ── Configuration ─────────────────────────────────────────────────────────────
+# config
 
 N_NODES   = 20
 R0_VALUES = [0.5, 1.0, 2.0, 3.0, 5.0]
-N_RUNS    = 200        # cascades per R₀  (only non-trivial ones are evaluated)
+N_RUNS    = 200        # cascades per r0; only non-trivial (>1 node) ones count
 BASE_SEED = 42
 OUT_DIR   = Path("results/figures/ml_evaluation")
 OUT_FILE  = OUT_DIR / "patient_zero_prediction_accuracy.png"
@@ -62,30 +35,21 @@ METHOD_LABELS = {
 }
 METHOD_ORDER = list(METHOD_LABELS.keys())
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-
 def build_complete_graph(n: int) -> nx.Graph:
     return nx.complete_graph(n)
 
 
 def random_rank(result_size: int, rng: random.Random) -> int:
-    """Simulate a random guess: rank is uniform over infected nodes (1-indexed)."""
+    """uniform random rank in [1, n]"""
     return rng.randint(1, result_size)
 
 
 def evaluate_cascade(cascade, rng: random.Random) -> dict[str, dict]:
-    """
-    Run all baselines on one cascade and return per-method metrics.
-
-    Returns
-    -------
-    dict  {method_name: {"rank": int, "top1": bool, "top3": bool}}
-    """
+    """run every baseline on one cascade, return per-method {rank, top1, top3}"""
     true_source = cascade.source
     obs = cascade.observed_graph
 
-    # Skip trivial cascades (only the source got infected — nothing to rank)
+    # nothing to rank if only the source ever got infected
     if obs.number_of_nodes() <= 1:
         return {}
 
@@ -93,18 +57,16 @@ def evaluate_cascade(cascade, rng: random.Random) -> dict[str, dict]:
     results = {}
 
     for method, ranked_nodes in preds.items():
-        # ranked_nodes is sorted most-likely → least-likely
         if true_source in ranked_nodes:
-            rank = ranked_nodes.index(true_source) + 1  # 1-indexed
+            rank = ranked_nodes.index(true_source) + 1
         else:
-            rank = len(ranked_nodes) + 1  # worst case
+            rank = len(ranked_nodes) + 1
         results[method] = {
             "rank": rank,
             "top1": rank == 1,
             "top3": rank <= 3,
         }
 
-    # Random baseline
     rand_rank = random_rank(obs.number_of_nodes(), rng)
     results["random"] = {
         "rank": rand_rank,
@@ -112,9 +74,6 @@ def evaluate_cascade(cascade, rng: random.Random) -> dict[str, dict]:
         "top3": rand_rank <= 3,
     }
     return results
-
-
-# ── Main ──────────────────────────────────────────────────────────────────────
 
 
 def main() -> None:
@@ -152,11 +111,8 @@ def main() -> None:
         results[r0] = dict(per_method)
         print(f"R₀={r0:.1f}  p={p:.4f}  evaluated {n_evaluated}/{N_RUNS} cascades")
 
-    # ── Print summary table ──────────────────────────────────────────────────
-    print("\n" + "=" * 75)
-    print(f"{'Method':<20}  " + "  ".join(f"R₀={r:>3.1f}" for r in R0_VALUES))
-    print(" " * 20 + "  " + "  ".join("Top1  Top3  MnRk" for _ in R0_VALUES))
-    print("-" * 75)
+    print(f"\n{'method':<20}  " + "  ".join(f"r0={r:>3.1f}" for r in R0_VALUES))
+    print(" " * 20 + "  " + "  ".join("top1  top3  mnrk" for _ in R0_VALUES))
 
     for method in METHOD_ORDER:
         row = f"{METHOD_LABELS[method]:<20}  "
@@ -170,9 +126,7 @@ def main() -> None:
             else:
                 row += "  —     —     —  "
         print(row)
-    print("=" * 75)
 
-    # ── Visualise ────────────────────────────────────────────────────────────
     fig = plt.figure(figsize=(15, 9))
     fig.patch.set_facecolor("#0d0d1a")
     fig.suptitle(
@@ -183,12 +137,13 @@ def main() -> None:
     gs = gridspec.GridSpec(2, 3, figure=fig, hspace=0.52, wspace=0.38)
 
     panel_bg = "#1a1a2e"
+    # only baselines here (no rf), so we pull just those colours
     palette  = {
-        "jordan":       "#e63946",
-        "closeness":    "#f4a261",
-        "betweenness":  "#2ec4b6",
-        "degree":       "#a8dadc",
-        "random":       "#888888",
+        "jordan":      METHOD_COLORS["jordan"],
+        "closeness":   METHOD_COLORS["closeness"],
+        "betweenness": METHOD_COLORS["betweenness"],
+        "degree":      METHOD_COLORS["degree"],
+        "random":      METHOD_COLORS["random"],
     }
     x       = np.arange(len(R0_VALUES))
     bar_w   = 0.15
@@ -196,7 +151,7 @@ def main() -> None:
                           (len(METHOD_ORDER) - 1) / 2 * bar_w,
                           len(METHOD_ORDER))
 
-    # ── A: Top-1 accuracy ──────────────────────────────────────────
+    # panel a: top-1
     ax_a = fig.add_subplot(gs[0, :2])
     ax_a.set_facecolor(panel_bg)
     for i, method in enumerate(METHOD_ORDER):
@@ -217,7 +172,7 @@ def main() -> None:
     ax_a.legend(fontsize=8, facecolor="#222", edgecolor="#444", labelcolor="lightgrey")
     for sp in ax_a.spines.values(): sp.set_edgecolor("#444")
 
-    # ── B: Top-3 accuracy ──────────────────────────────────────────
+    # panel b: top-3
     ax_b = fig.add_subplot(gs[1, :2])
     ax_b.set_facecolor(panel_bg)
     for i, method in enumerate(METHOD_ORDER):
@@ -238,7 +193,7 @@ def main() -> None:
     ax_b.legend(fontsize=8, facecolor="#222", edgecolor="#444", labelcolor="lightgrey")
     for sp in ax_b.spines.values(): sp.set_edgecolor("#444")
 
-    # ── C: Mean rank (lower = better) ──────────────────────────────
+    # panel c: mean rank (lower = better)
     ax_c = fig.add_subplot(gs[0, 2])
     ax_c.set_facecolor(panel_bg)
     for method in METHOD_ORDER:
@@ -256,10 +211,9 @@ def main() -> None:
     ax_c.legend(fontsize=7, facecolor="#222", edgecolor="#444", labelcolor="lightgrey")
     for sp in ax_c.spines.values(): sp.set_edgecolor("#444")
 
-    # ── D: Cascade coverage vs R₀ (context panel) ──────────────────
+    # panel d: how many of the n_runs cascades were actually non-trivial
     ax_d = fig.add_subplot(gs[1, 2])
     ax_d.set_facecolor(panel_bg)
-    # count how many cascades were non-trivial
     n_eval = [len(next(iter(results[r0].values()))) for r0 in R0_VALUES]
     bars = ax_d.bar(range(len(R0_VALUES)), n_eval,
                     color=plt.cm.plasma(np.linspace(0.2, 0.8, len(R0_VALUES))),

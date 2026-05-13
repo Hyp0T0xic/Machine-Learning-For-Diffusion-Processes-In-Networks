@@ -1,27 +1,6 @@
-"""
-src.features.extract
-====================
-Compute per-node structural features on undirected cascade graphs.
-
-Each cascade is represented as an undirected graph; for every node we wish
-to produce a feature vector that can be used by an ML classifier to rank
-nodes by their likelihood of being the true source.
-
-Active features
----------------
-- degree_zscore
-- largest_comp_fraction_zscore
-- nodes_within_2_hops_zscore
-- jordan_center_dist
-- cascade_diameter
-- cascade_leaves
-- endpoint_balance
-
-Functions (TODO)
-----------------
-extract_node_features : Return a feature dict for every node in a cascade.
-build_feature_matrix  : Stack features into a numpy array X and label vector y.
-"""
+"""per-node structural features for the rf ranker.
+3 z-scored within the cascade (degree, largest_comp_fraction, nodes_within_2_hops) + 4 absolute
+(jordan_center_dist, cascade_diameter, cascade_leaves, endpoint_balance)."""
 from __future__ import annotations
 
 import networkx as nx

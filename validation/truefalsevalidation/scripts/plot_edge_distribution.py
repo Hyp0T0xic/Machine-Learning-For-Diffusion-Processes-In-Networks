@@ -1,14 +1,5 @@
 #!/usr/bin/env python
-"""
-validation/plot_edge_distribution.py
-=====================================
-Plot the distribution of edge counts per cascade in the FalseNews dataset,
-broken down by veracity (TRUE, FALSE, MIXED) and combined.
-
-Usage
------
-    python validation/plot_edge_distribution.py
-"""
+"""falsenews edges-per-cascade histogram, split by TRUE / FALSE / MIXED veracity"""
 from __future__ import annotations
 
 import sys

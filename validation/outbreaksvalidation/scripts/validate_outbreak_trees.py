@@ -1,11 +1,5 @@
 #!/usr/bin/env python
-"""
-Validate trained RF models (IC-BA, IC-ER) against real-world biological
-transmission trees (OutbreakTrees). Compares to centrality baselines across
-multiple seeds. Saves metrics to JSON for separate plotting.
-
-Usage: python validation/outbreaksvalidation/scripts/validate_outbreak_trees.py
-"""
+"""evaluate pre-trained ic-ba and ic-er rf on real outbreak-tree cascades, dump metrics to json"""
 from __future__ import annotations
 
 import collections
@@ -27,7 +21,7 @@ from src.data.cascade import CascadeResult
 from src.baselines.centrality import predict_all
 from src.evaluation.metrics import evaluate_ranker, distance_to_source
 
-# ── Config ────────────────────────────────────────────────────────────────────
+# config
 
 TREES_DIR        = _REPO_ROOT / "data" / "outbreak_trees" / "csv_exports"
 MODELS_DIR       = _REPO_ROOT / "results" / "models"
@@ -50,7 +44,7 @@ METHOD_LABELS = {
 METHOD_ORDER = list(METHOD_LABELS.keys())
 
 
-# ── Data loading ──────────────────────────────────────────────────────────────
+# data loading
 
 def load_outbreak_tree(csv_path: Path) -> CascadeResult | None:
     raw_edges = []
@@ -129,7 +123,7 @@ def load_all_trees(max_count: int = MAX_CASCADES) -> list[CascadeResult]:
     return cascades
 
 
-# ── Evaluation ────────────────────────────────────────────────────────────────
+# evaluation
 
 def _evaluate_random(cascades, seed=42):
     """Evaluate random guessing baseline. Returns (rankings, eval_dict)."""

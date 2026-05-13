@@ -1,11 +1,5 @@
 #!/usr/bin/env python
-"""
-Plot cascade size distribution for the FalseNews dataset.
-Reads: FalseNews_Code_Data/FalseNews_Code_Data/data/raw_data_anon.csv
-Writes: figures/cascade_size_distribution_falsenews.png
-
-Usage: python validation/truefalsevalidation/scripts/plot_cascade_sizes.py
-"""
+"""falsenews cascade-size histograms (log and linear), split by TRUE / FALSE / MIXED veracity"""
 from __future__ import annotations
 
 from pathlib import Path

@@ -1,15 +1,5 @@
 #!/usr/bin/env python
-"""
-scripts/run_simulation.py
-=========================
-Entry point — simulate IC/SI/SIR diffusion cascades on all three contact
-networks across a grid of R₀ values, print statistics, save results, and
-render cascade-tree visualisations.
-
-Usage
------
-    python scripts/run_simulation.py
-"""
+"""run the full ic/si/sir × {er, ba, complete} × r0 grid, save cascades.json + example tree figures"""
 from __future__ import annotations
 
 import matplotlib

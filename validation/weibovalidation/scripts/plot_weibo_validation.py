@@ -1,10 +1,5 @@
 #!/usr/bin/env python
-"""
-Plot Weibo real-world validation results from saved JSON.
-Uses consistent color mapping: RF variants are greener.
-
-Usage: python validation/weibovalidation/scripts/plot_weibo_validation.py
-"""
+"""bar chart of weibo top-1/top-3 accuracy per method from the cached validation json"""
 from __future__ import annotations
 
 import json
@@ -14,7 +9,7 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 sys.path.insert(0, str(_REPO_ROOT))
 
-from src.visualization.theme import ACCENT_COLORS
+from src.visualization.theme import ACCENT_COLORS, METHOD_COLORS as _CANON
 
 import matplotlib
 matplotlib.use("Agg")
@@ -24,16 +19,9 @@ import numpy as np
 DATA_DIR   = _REPO_ROOT / "validation/weibovalidation/data"
 OUT_DIR    = _REPO_ROOT / "validation/weibovalidation/figures"
 
-# Consistent color mapping: RF (BA) is Green, RF (ER) is Olive/Teal
-METHOD_COLORS = {
-    "RF (IC-BA)":    ACCENT_COLORS[5],  # Green
-    "RF (IC-ER)":    ACCENT_COLORS[2],  # Teal
-    "Jordan Center": ACCENT_COLORS[0],  # Salmon
-    "closeness":     ACCENT_COLORS[1],  # Pink
-    "betweenness":   ACCENT_COLORS[8],  # Purple
-    "Degree":        ACCENT_COLORS[4],  # Gold
-    "random":        ACCENT_COLORS[6],  # Periwinkle
-}
+# older versions of validate_weibo.json used title-cased keys, map them back to canonical
+_KEY_NORMALIZE = {"Jordan Center": "jordan", "Degree": "degree"}
+METHOD_COLORS = {**_CANON, **{k: _CANON[v] for k, v in _KEY_NORMALIZE.items()}}
 
 def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -50,22 +38,22 @@ def main() -> None:
     labels_map = data.get("method_labels", {})
     n_cascades = data.get("n_cascades", "N/A")
 
+    # closeness and betweenness are dropped — they sit on top of degree numerically and
+    # don't add interpretive value for this dataset
     canonical_methods = [
         "RF (IC-BA)",
         "RF (IC-ER)",
-        "Jordan Center",
-        "closeness",
-        "Degree",
+        "jordan",
+        "degree",
         "random",
     ]
 
     default_labels = {
         "RF (IC-BA)": "Random Forest (IC-BA)",
         "RF (IC-ER)": "Random Forest (IC-ER)",
-        "Jordan Center": "Jordan Centre",
-        "closeness": "Closeness",
-        "Degree": "Degree",
-        "random": "Random",
+        "jordan":     "Jordan Centre",
+        "degree":     "Degree",
+        "random":     "Random",
     }
 
     x = np.arange(len(canonical_methods))

@@ -1,14 +1,4 @@
-"""
-src.utils
-=========
-Shared utilities used across the pipeline.
-
-Functions
----------
-set_seed    : Set random seeds for Python, NumPy (and optionally PyTorch).
-load_config : Load a YAML config file into a dict.
-pretty_dict : Format a nested dict as a human-readable string for logging.
-"""
+"""shared helpers: seed everything, load yaml config, pretty-print nested dicts"""
 from __future__ import annotations
 
 import random

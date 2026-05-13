@@ -1,11 +1,5 @@
 #!/usr/bin/env python
-"""
-Validate trained RF models (IC-BA, IC-ER) against real Weibo cascade data.
-Parses Weibo repost-cascade JSON files, evaluates source identification
-accuracy across multiple seeds, and saves metrics to JSON for plotting.
-
-Usage: python validation/weibovalidation/scripts/validate_weibo.py
-"""
+"""evaluate pre-trained ic-ba and ic-er rf models on 100 large real weibo repost cascades, dump metrics to json"""
 from __future__ import annotations
 
 import json
@@ -24,9 +18,9 @@ from src.data.cascade import CascadeResult
 from src.baselines.centrality import predict_all
 from src.evaluation.metrics import evaluate_ranker, distance_to_source
 
-# ── Config ────────────────────────────────────────────────────────────────────
+# config
 
-WEIBO_DIR        = _REPO_ROOT / "rumdect" / "Weibo"
+WEIBO_DIR        = _REPO_ROOT / "data" / "rumdect" / "rumdect" / "Weibo"
 MODELS_DIR       = _REPO_ROOT / "results" / "models"
 DATA_DIR         = _REPO_ROOT / "validation" / "weibovalidation" / "data"
 
@@ -47,7 +41,7 @@ METHOD_LABELS = {
 METHOD_ORDER = list(METHOD_LABELS.keys())
 
 
-# ── Data loading ──────────────────────────────────────────────────────────────
+# data loading
 
 def load_weibo_cascade(json_path: Path) -> CascadeResult | None:
     with open(json_path, "r", encoding="utf-8") as f:
@@ -143,7 +137,7 @@ def load_weibo_cascades(max_count: int = MAX_CASCADES) -> list[CascadeResult]:
     return cascades
 
 
-# ── Evaluation ────────────────────────────────────────────────────────────────
+# evaluation
 
 def _evaluate_random(cascades, seed=42):
     """Evaluate random guessing baseline. Returns (rankings, eval_dict)."""

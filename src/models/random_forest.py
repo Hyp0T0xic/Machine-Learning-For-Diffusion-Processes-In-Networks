@@ -1,11 +1,4 @@
-"""
-src.models.random_forest
-========================
-Random Forest classifier for source detection.
-
-Wraps scikit-learn's RandomForestClassifier to interface directly with
-CascadeResult objects, scoring nodes and ranking them.
-"""
+"""thin rf wrapper that takes a cascaderesult and returns nodes ranked by predicted source probability"""
 from __future__ import annotations
 
 import numpy as np

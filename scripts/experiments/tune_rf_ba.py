@@ -1,19 +1,6 @@
 #!/usr/bin/env python
-"""
-scripts/experiments/tune_rf_ba.py
-=================================
-Perform standard Machine Learning evaluation and Hyperparameter Tuning 
-for the Random Forest model on the source detection task (BA network).
-
-This script:
-1. Generates a dataset of cascades.
-2. Performs a Randomized Search Cross-Validation (with StratifiedGroupKFold) 
-   to find the best hyperparameters, optimizing for Average Precision (PR-AUC) 
-   due to the severe class imbalance (1 source vs 19 non-sources).
-3. Evaluates the best model on a hold-out test set using standard ML metrics
-   (ROC AUC, Precision-Recall AUC, Classification Report).
-4. Plots ROC and Precision-Recall curves.
-"""
+"""rf hyperparameter tuning on ic-ba via randomizedsearchcv, optimising pr-auc (heavy class imbalance).
+plots roc + pr curves for the best model on the held-out split."""
 from __future__ import annotations
 
 import random
@@ -40,19 +27,20 @@ from sklearn.metrics import (
 from src.data.cascade import r0_to_params, IndependentCascade, CascadeResult
 from src.data.networks import generate_ba_network
 from src.features.extract import build_feature_matrix
+from src.visualization.theme import METHOD_COLORS
 
-# -- Configuration --
+# config
 N_NODES = 200
 BA_M = 3
 R0_VALUES = [0.5, 1.0, 2.0, 3.0, 5.0]
 CASCADE_SIZE = 25
-N_TARGET = 1000  # Smaller target per R0 for faster tuning (total 2500 cascades)
+N_TARGET = 1000  # cascades per r0, smaller than train_rf_ic_ba so tuning is faster
 SEED = 42
 OUT_DIR = Path("results/figures/ml_evaluation")
 
 
 def generate_mixed_data(seed: int) -> list[CascadeResult]:
-    """Generate a mix of cascades across all R0 values."""
+    """build a mixed pool of cascades, n_target per r0"""
     G = generate_ba_network(n=N_NODES, m=BA_M, seed=seed)
     avg_deg = float(np.mean([d for _, d in G.degree()]))
     nodes = list(G.nodes())
@@ -104,9 +92,7 @@ def main():
     print(f"Training set: {len(X_train)} samples")
     print(f"Test set: {len(X_test)} samples")
 
-    # 3. Hyperparameter Tuning using Cross-Validation
-    # We optimize for 'average_precision' (PR-AUC) because accuracy/ROC can be misleading 
-    # when the dataset is heavily imbalanced (1:19 ratio).
+    # optimise pr-auc because the source-vs-not class ratio is roughly 1:19
     param_distributions = {
         'n_estimators': [100, 300, 500, 800],
         'max_depth': [None, 10, 20, 30],
@@ -114,55 +100,52 @@ def main():
         'min_samples_leaf': [1, 2, 5, 10],
         'max_features': [2, 3, None]
     }
-    
+
     base_rf = RandomForestClassifier(class_weight="balanced", random_state=SEED)
-    
-    # Inner CV for tuning (so we don't leak groups across folds)
+
+    # inner cv: group by cascade so no cascade leaks across folds
     sgkf_inner = StratifiedGroupKFold(n_splits=3, shuffle=True, random_state=SEED)
-    
+
     search = RandomizedSearchCV(
         base_rf,
         param_distributions=param_distributions,
-        n_iter=50,  # Try 50 random combinations (increase for more thorough search)
+        n_iter=50,
         scoring='average_precision',
         cv=sgkf_inner,
-        n_jobs=1,  # Safe for Windows without crashing the terminal
+        n_jobs=1,  # windows safe — n_jobs > 1 can deadlock with mlflow autologging
         verbose=3,
         random_state=SEED
     )
-    
-    print("\nStarting Hyperparameter Tuning (RandomizedSearchCV)...")
+
+    print("\ntuning ...")
     mlflow.set_tracking_uri("sqlite:///mlruns.db")
     mlflow.set_experiment("Random_Forest_Tuning_BA")
     mlflow.sklearn.autolog()
-    
-    # Note: We must pass groups_train to fit so the inner CV splits properly
+
+    # pass groups_train so the inner sgkf actually respects the grouping
     search.fit(X_train, y_train, groups=groups_train)
-    
-    print("\n--- Tuning Results ---")
-    print(f"Best PR-AUC score from CV: {search.best_score_:.4f}")
-    print("Best Hyperparameters found:")
+
+    print(f"\nbest cv pr-auc: {search.best_score_:.4f}")
+    print("best hyperparameters:")
     for k, v in search.best_params_.items():
         print(f"  {k}: {v}")
 
-    # 4. Final Evaluation on Hold-out Test Set
     best_model = search.best_estimator_
     
-    print("\nEvaluating Best Model on Hold-Out Test Set...")
+    print("\nevaluating best model on held-out test set ...")
     y_pred = best_model.predict(X_test)
     y_proba = best_model.predict_proba(X_test)[:, 1]
-    
-    print("\n--- Classification Report ---")
+
+    print("\nclassification report")
     print(classification_report(y_test, y_pred, target_names=["Non-Source", "Source"]))
-    
+
     roc_auc = roc_auc_score(y_test, y_proba)
     pr_auc = average_precision_score(y_test, y_proba)
-    
-    print(f"ROC AUC Score: {roc_auc:.4f}")
-    print(f"PR AUC Score:  {pr_auc:.4f}")
 
-    # 5. Evaluate per-R0 ranking metrics
-    print("\n--- Per-R0 Ranking Metrics ---")
+    print(f"roc auc: {roc_auc:.4f}")
+    print(f"pr  auc: {pr_auc:.4f}")
+
+    print("\nper-r0 ranking metrics on held-out cascades")
     test_cascade_indices = sorted(set(groups[i] for i in test_idx))
     test_cascades = [cascades[i] for i in test_cascade_indices]
     test_r0s = [r0s[i] for i in test_cascade_indices]
@@ -187,14 +170,13 @@ def main():
             top1 = metrics["top_k"][1] * 100
             top3 = metrics["top_k"][3] * 100
             mrr = metrics["mrr"]
-            print(f"R0={eval_r0}: Top-1: {top1:.1f}%, Top-3: {top3:.1f}%, MRR: {mrr:.3f}")
-            
+            print(f"r0={eval_r0}: top-1 {top1:.1f}%, top-3 {top3:.1f}%, mrr {mrr:.3f}")
+
             step = int(eval_r0 * 10)
             mlflow.log_metric("Top1_Accuracy", top1, step=step)
             mlflow.log_metric("Top3_Accuracy", top3, step=step)
             mlflow.log_metric("MRR", mrr, step=step)
 
-    # 6. Plot ROC and PR Curves
     fig, (ax_roc, ax_pr) = plt.subplots(1, 2, figsize=(14, 6))
     fig.patch.set_facecolor("#0d0d1a")
     
@@ -208,15 +190,16 @@ def main():
         ax.title.set_color('white')
         ax.title.set_fontweight('bold')
 
+    _rf_ba_color = METHOD_COLORS["RF (IC-BA)"]
     RocCurveDisplay.from_predictions(
-        y_test, y_proba, name="Random Forest", ax=ax_roc, color="#ffb703"
+        y_test, y_proba, name="Random Forest", ax=ax_roc, color=_rf_ba_color
     )
     ax_roc.plot([0, 1], [0, 1], color="gray", linestyle="--")
     ax_roc.set_title("Receiver Operating Characteristic (ROC)")
     legend = ax_roc.legend(facecolor="#222", edgecolor="#444", labelcolor="white")
 
     PrecisionRecallDisplay.from_predictions(
-        y_test, y_proba, name="Random Forest", ax=ax_pr, color="#2ec4b6"
+        y_test, y_proba, name="Random Forest", ax=ax_pr, color=_rf_ba_color
     )
     baseline_pr = sum(y_test) / len(y_test)
     ax_pr.plot([0, 1], [baseline_pr, baseline_pr], color="gray", linestyle="--", label=f"Random Chance ({baseline_pr:.2f})")

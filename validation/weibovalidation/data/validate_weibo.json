@@ -6,43 +6,198 @@
   "method_labels": {
     "RF (IC-BA)": "Random Forest (IC-BA)",
     "RF (IC-ER)": "Random Forest (IC-ER)",
-    "Jordan Center": "Jordan Centre",
-    "Degree": "Degree"
+    "jordan": "Jordan Centre",
+    "closeness": "Closeness",
+    "betweenness": "Betweenness",
+    "degree": "Degree",
+    "random": "Random"
   },
   "method_order": [
     "RF (IC-BA)",
     "RF (IC-ER)",
-    "Jordan Center",
-    "Degree"
+    "jordan",
+    "closeness",
+    "betweenness",
+    "degree",
+    "random"
   ],
   "metrics": {
-    "RF (IC-BA)": {
-      "top_1": 12.0,
-      "top_3": 13.0,
-      "top_1_std": 0.0,
-      "top_3_std": 0.0,
-      "total": 100
+    "random": {
+      "top1_mean": 0.0,
+      "top1_std": 0.0,
+      "top3_mean": 0.4,
+      "top3_std": 0.8000000000000002,
+      "mrr_mean": 0.00753191234796238,
+      "mrr_std": 0.0021395299005221202,
+      "mean_hops": 1.8980000000000001
     },
     "RF (IC-ER)": {
-      "top_1": 33.0,
-      "top_3": 40.0,
-      "top_1_std": 0.0,
-      "top_3_std": 0.0,
-      "total": 100
+      "top1_mean": 32.0,
+      "top1_std": 0.0,
+      "top3_mean": 36.0,
+      "top3_std": 0.0,
+      "mrr_mean": 0.34132340566638325,
+      "mrr_std": 0.0,
+      "mean_hops": 1.06
     },
-    "Jordan Center": {
-      "top_1": 44.8,
-      "top_3": 71.4,
-      "top_1_std": 1.3266499161421599,
-      "top_3_std": 1.2,
-      "total": 100
+    "RF (IC-BA)": {
+      "top1_mean": 17.0,
+      "top1_std": 0.0,
+      "top3_mean": 19.0,
+      "top3_std": 0.0,
+      "mrr_mean": 0.18515191802319098,
+      "mrr_std": 0.0,
+      "mean_hops": 1.404
     },
-    "Degree": {
-      "top_1": 90.0,
-      "top_3": 100.0,
-      "top_1_std": 0.0,
-      "top_3_std": 0.0,
-      "total": 100
+    "closeness": {
+      "top1_mean": 93.0,
+      "top1_std": 0.0,
+      "top3_mean": 97.0,
+      "top3_std": 0.0,
+      "mrr_mean": 0.9550173611111111,
+      "mrr_std": 0.0,
+      "mean_hops": 0.13
+    },
+    "degree": {
+      "top1_mean": 90.0,
+      "top1_std": 0.0,
+      "top3_mean": 100.0,
+      "top3_std": 0.0,
+      "mrr_mean": 0.95,
+      "mrr_std": 0.0,
+      "mean_hops": 0.16
+    },
+    "jordan": {
+      "top1_mean": 44.6,
+      "top1_std": 2.870540018881465,
+      "top3_mean": 69.4,
+      "top3_std": 1.3564659966250536,
+      "mrr_mean": 0.5874095211716669,
+      "mrr_std": 0.018419911865324635,
+      "mean_hops": 0.8620000000000001
+    },
+    "betweenness": {
+      "top1_mean": 93.0,
+      "top1_std": 0.0,
+      "top3_mean": 100.0,
+      "top3_std": 0.0,
+      "mrr_mean": 0.9650000000000001,
+      "mrr_std": 1.1102230246251565e-16,
+      "mean_hops": 0.13
+    }
+  },
+  "hop_distribution": {
+    "random": {
+      "counts": {
+        "0": 0,
+        "1": 288,
+        "2": 121,
+        "3": 35,
+        "4": 56
+      },
+      "percentages": {
+        "0": 0.0,
+        "1": 57.6,
+        "2": 24.2,
+        "3": 7.0,
+        "4": 11.2
+      }
+    },
+    "RF (IC-ER)": {
+      "counts": {
+        "0": 160,
+        "1": 205,
+        "2": 100,
+        "3": 25,
+        "4": 10
+      },
+      "percentages": {
+        "0": 32.0,
+        "1": 41.0,
+        "2": 20.0,
+        "3": 5.0,
+        "4": 2.0
+      }
+    },
+    "RF (IC-BA)": {
+      "counts": {
+        "0": 85,
+        "1": 200,
+        "2": 163,
+        "3": 42,
+        "4": 10
+      },
+      "percentages": {
+        "0": 17.0,
+        "1": 40.0,
+        "2": 32.6,
+        "3": 8.4,
+        "4": 2.0
+      }
+    },
+    "closeness": {
+      "counts": {
+        "0": 465,
+        "1": 20,
+        "2": 0,
+        "3": 15,
+        "4": 0
+      },
+      "percentages": {
+        "0": 93.0,
+        "1": 4.0,
+        "2": 0.0,
+        "3": 3.0,
+        "4": 0.0
+      }
+    },
+    "degree": {
+      "counts": {
+        "0": 450,
+        "1": 35,
+        "2": 0,
+        "3": 15,
+        "4": 0
+      },
+      "percentages": {
+        "0": 90.0,
+        "1": 7.0,
+        "2": 0.0,
+        "3": 3.0,
+        "4": 0.0
+      }
+    },
+    "jordan": {
+      "counts": {
+        "0": 223,
+        "1": 182,
+        "2": 61,
+        "3": 19,
+        "4": 15
+      },
+      "percentages": {
+        "0": 44.6,
+        "1": 36.4,
+        "2": 12.2,
+        "3": 3.8,
+        "4": 3.0
+      }
+    },
+    "betweenness": {
+      "counts": {
+        "0": 465,
+        "1": 20,
+        "2": 0,
+        "3": 15,
+        "4": 0
+      },
+      "percentages": {
+        "0": 93.0,
+        "1": 4.0,
+        "2": 0.0,
+        "3": 3.0,
+        "4": 0.0
+      }
     }
   }
 }

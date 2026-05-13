@@ -23,19 +23,20 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import sys
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from src.visualization.theme import ACCENT_COLORS, METHOD_COLORS
+
 DATA_DIR   = _REPO_ROOT / "validation/truefalsevalidation/data"
 OUT_DIR    = _REPO_ROOT / "validation/truefalsevalidation/figures"
-
-COLORS = [
-    "#D99685", "#E38EA0", "#4DB6AC", "#9CB067", "#C0A064",
-    "#7FB382", "#A3A1D8", "#DA92B7", "#C594D1", "#56B4BE",
-]
 
 HOP_BINS  = ["0", "1", "2", "3", "4"]
 HOP_LABEL = ["0", "1", "2", "3", "4+"]
@@ -46,7 +47,9 @@ def _accuracy_panel(ax, present, metrics, labels, mean_key, std_key, title):
     stds = [metrics[m][std_key]  for m in present]
     x = np.arange(len(present))
     for xi, (val, std) in enumerate(zip(vals, stds)):
-        ax.bar(xi, val, facecolor=COLORS[xi % len(COLORS)],
+        m = present[xi]
+        color = METHOD_COLORS.get(m, ACCENT_COLORS[xi % len(ACCENT_COLORS)])
+        ax.bar(xi, val, facecolor=color,
                edgecolor="black", linewidth=0.5)
         lbl = f"{val:.1f}±{std:.1f}%" if std > 0.05 else f"{val:.1f}%"
         ax.text(xi, val + 0.5, lbl, ha="center", va="bottom", fontsize=8)
@@ -68,8 +71,9 @@ def _hop_panel(ax, present, hop_dist, labels, title):
         pcts = hop_dist.get(m, {}).get("percentages", {})
         ys = [pcts.get(b, 0.0) for b in HOP_BINS]
         offset = (i - (n_methods - 1) / 2) * bar_w
+        color = METHOD_COLORS.get(m, ACCENT_COLORS[i % len(ACCENT_COLORS)])
         ax.bar(x + offset, ys, bar_w,
-               label=labels[m], facecolor=COLORS[i % len(COLORS)],
+               label=labels[m], facecolor=color,
                edgecolor="black", linewidth=0.4)
     ax.set_xticks(x)
     ax.set_xticklabels(HOP_LABEL)

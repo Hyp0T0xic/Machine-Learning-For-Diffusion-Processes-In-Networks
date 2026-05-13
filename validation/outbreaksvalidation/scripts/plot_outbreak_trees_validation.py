@@ -1,13 +1,5 @@
 #!/usr/bin/env python
-"""
-Plot OutbreakTrees real-world validation results from saved JSON.
-Generates:
-  1. outbreak_trees_accuracy.png (Bar charts)
-  2. outbreak_trees_hops.png (Grouped bar chart)
-  3. outbreak_trees_hops_cumulative.png (Cumulative line chart)
-
-Reads:  data/validate_outbreak_trees.json
-"""
+"""three outbreak-trees plots from the cached json: top-1/top-3 bars, hop grouped bars, hop cumulative"""
 from __future__ import annotations
 
 import json
@@ -17,7 +9,7 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 sys.path.insert(0, str(_REPO_ROOT))
 
-from src.visualization.theme import ACCENT_COLORS
+from src.visualization.theme import ACCENT_COLORS, METHOD_COLORS
 
 import matplotlib
 matplotlib.use("Agg")
@@ -29,17 +21,6 @@ OUT_DIR  = _REPO_ROOT / "validation/outbreaksvalidation/figures"
 
 HOP_BINS  = ["0", "1", "2", "3", "4"]
 HOP_LABEL = ["0", "1", "2", "3", "4+"]
-
-# Consistent color mapping: RF (BA) is Green, RF (ER) is Teal
-METHOD_COLORS = {
-    "RF (IC-BA)":    ACCENT_COLORS[5],  # Green
-    "RF (IC-ER)":    ACCENT_COLORS[2],  # Teal
-    "jordan":        ACCENT_COLORS[0],  # Salmon
-    "closeness":     ACCENT_COLORS[1],  # Pink
-    "degree":        ACCENT_COLORS[4],  # Gold
-    "random":        ACCENT_COLORS[6],  # Periwinkle
-    "betweenness":   ACCENT_COLORS[8],  # Purple
-}
 
 
 def _accuracy_panel(ax, present, metrics, labels, mean_key, std_key, title):

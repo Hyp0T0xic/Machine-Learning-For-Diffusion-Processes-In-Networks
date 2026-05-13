@@ -1,9 +1,5 @@
 #!/usr/bin/env python
-"""
-validation/truefalsevalidation/scripts/plot_truefalse_cascades.py
-Show example cascades for real FalseNews (True/False) diffusion trees.
-Updated to use a clean white background, 5-example layout, and standardized titles.
-"""
+"""draw 5 example falsenews retweet cascades from the dataset"""
 from __future__ import annotations
 
 import json

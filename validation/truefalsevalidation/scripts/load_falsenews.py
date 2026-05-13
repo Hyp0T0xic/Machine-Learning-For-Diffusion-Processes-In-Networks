@@ -1,8 +1,4 @@
-"""
-Load FalseNews retweet cascades from raw CSV and convert to CascadeResult
-objects for the ML pipeline. Strips edge direction + timestamps, truncates
-via BFS to match simulated cascade sizes.
-"""
+"""load falsenews retweet cascades from csv, bfs-truncate to target size, wrap as cascaderesult objects"""
 from __future__ import annotations
 
 from collections import deque

@@ -1,24 +1,5 @@
 #!/usr/bin/env python
-"""
-Validate RF models against Weibo cascades in the natural-range sense:
-take the 101 cascades whose size is closest to the population median
-(50 below, the median, and 50 above).
-
-Two-pass loader: first quickly measure the size of every Weibo event
-to estimate the median, then fully parse only the 101 cascades closest
-to the median.
-
-JSON output matches the standardized format used by validate_weibo.py
-(commit 2b0b737) — per-method `metrics` plus a top-level
-`hop_distribution` dict keyed by method.
-
-Reads:  data/rumdect/rumdect/Weibo/*.json
-        results/models/ic_ba/rf_model_size25.pkl
-        results/models/ic_er/rf_model_size25.pkl
-Writes: validation/weibovalidation/data/validate_weibo_natural_range.json
-
-Usage: python validation/weibovalidation/scripts/validate_weibo_natural_range.py
-"""
+"""evaluate pre-trained rf models on the 101 weibo cascades closest in size to the population median"""
 from __future__ import annotations
 
 import json
@@ -37,9 +18,9 @@ from src.data.cascade import CascadeResult
 from src.baselines.centrality import predict_all
 from src.evaluation.metrics import evaluate_ranker, distance_to_source
 
-# ── Config ────────────────────────────────────────────────────────────────────
+# config
 
-WEIBO_DIR  = _REPO_ROOT / "rumdect" / "Weibo"
+WEIBO_DIR  = _REPO_ROOT / "data" / "rumdect" / "rumdect" / "Weibo"
 MODELS_DIR = _REPO_ROOT / "results" / "models"
 DATA_DIR   = _REPO_ROOT / "validation" / "weibovalidation" / "data"
 
@@ -68,7 +49,7 @@ METHOD_LABELS = {
 METHOD_ORDER = list(METHOD_LABELS.keys())
 
 
-# ── Data loading ──────────────────────────────────────────────────────────────
+# data loading
 
 
 def _fast_cascade_size(json_path: Path) -> int | None:
@@ -208,7 +189,7 @@ def select_median_centred_cascades(
     return cascades, pop_info
 
 
-# ── Evaluation ────────────────────────────────────────────────────────────────
+# evaluation
 
 
 def _evaluate_random(cascades, seed=42):
@@ -314,7 +295,7 @@ def _aggregate_seeds(all_seed_results, all_seed_distances):
     return avg, hop_dist
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# main
 
 
 def main() -> None:

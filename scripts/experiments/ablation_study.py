@@ -1,12 +1,5 @@
 #!/usr/bin/env python
-"""
-scripts/experiments/ablation_study.py
-=====================================
-Ablation study to test all 63 possible subsets of the 6 extracted features
-for source detection on Barabási-Albert networks.
-
-Logs results to MLflow.
-"""
+"""try every non-empty subset of the 6 structural features on ic-ba cascades and log average_precision to mlflow"""
 from __future__ import annotations
 
 import random
