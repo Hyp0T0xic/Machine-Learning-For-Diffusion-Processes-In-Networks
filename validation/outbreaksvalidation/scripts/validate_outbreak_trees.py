@@ -13,6 +13,7 @@ import csv
 import json
 import random
 import sys
+from collections import defaultdict
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
@@ -23,7 +24,8 @@ import networkx as nx
 import numpy as np
 
 from src.data.cascade import CascadeResult
-from src.baselines.centrality import jordan_center, degree_rank
+from src.baselines.centrality import predict_all
+from src.evaluation.metrics import evaluate_ranker, distance_to_source
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
@@ -39,8 +41,11 @@ SEEDS            = [42, 123, 456, 789, 1024]
 METHOD_LABELS = {
     "RF (IC-BA)":    "Random Forest (IC-BA)",
     "RF (IC-ER)":    "Random Forest (IC-ER)",
-    "Jordan Center": "Jordan Centre",
-    "Degree":        "Degree",
+    "jordan":        "Jordan Centre",
+    "closeness":     "Closeness",
+    "betweenness":   "Betweenness",
+    "degree":        "Degree",
+    "random":        "Random",
 }
 METHOD_ORDER = list(METHOD_LABELS.keys())
 
@@ -126,59 +131,107 @@ def load_all_trees(max_count: int = MAX_CASCADES) -> list[CascadeResult]:
 
 # ── Evaluation ────────────────────────────────────────────────────────────────
 
-def evaluate_method(cascades: list[CascadeResult], rank_fn, name: str) -> dict:
-    top1_correct = 0
-    top3_correct = 0
-    total = 0
-
-    for cascade in cascades:
-        try:
-            ranked = rank_fn(cascade)
-        except Exception:
-            continue
-
-        if not ranked:
-            continue
-
-        source = cascade.source
-        total += 1
-        if ranked[0] == source:
-            top1_correct += 1
-        if source in ranked[:3]:
-            top3_correct += 1
-
-    top1_acc = (top1_correct / total * 100) if total > 0 else 0
-    top3_acc = (top3_correct / total * 100) if total > 0 else 0
-    return {"name": name, "top1": top1_acc, "top3": top3_acc, "total": total}
+def _evaluate_random(cascades, seed=42):
+    """Evaluate random guessing baseline. Returns (rankings, eval_dict)."""
+    rng = random.Random(seed)
+    rankings = []
+    for r in cascades:
+        nodes = list(r.observed_graph.nodes())
+        rng.shuffle(nodes)
+        rankings.append(nodes)
+    return rankings, evaluate_ranker(cascades, rankings, ks=[1, 3])
 
 
 def _run_seed(cascades, models, seed):
+    """Run all methods for a single seed. Returns (metrics_dict, distances_dict)."""
     random.seed(seed)
     np.random.seed(seed)
 
     results = {}
-    results["Jordan Center"] = evaluate_method(cascades, jordan_center, "Jordan Center")
-    results["Degree"] = evaluate_method(cascades, degree_rank, "Degree")
+    all_distances: dict[str, list[float]] = {}
+
+    # RF models
     for name, model in models.items():
-        results[name] = evaluate_method(cascades, model.rank_nodes, name)
+        rankings = [model.rank_nodes(c) for c in cascades]
+        results[name] = evaluate_ranker(cascades, rankings, ks=[1, 3])
+        all_distances[name] = [
+            distance_to_source(c, r) for c, r in zip(cascades, rankings)
+        ]
 
-    return results
+    # Centrality baselines (jordan, closeness, betweenness, degree)
+    baseline_cols: dict[str, list] = defaultdict(list)
+    for c in cascades:
+        preds = predict_all(c)
+        for m_name, ranking in preds.items():
+            baseline_cols[m_name].append(ranking)
+    for m_name, rankings in baseline_cols.items():
+        results[m_name] = evaluate_ranker(cascades, rankings, ks=[1, 3])
+        all_distances[m_name] = [
+            distance_to_source(c, r) for c, r in zip(cascades, rankings)
+        ]
+
+    # Random baseline
+    rand_rankings, rand_eval = _evaluate_random(cascades, seed=seed)
+    results["random"] = rand_eval
+    all_distances["random"] = [
+        distance_to_source(c, r) for c, r in zip(cascades, rand_rankings)
+    ]
+
+    return results, all_distances
 
 
-def _aggregate_seeds(all_seed_results):
+def _compute_hop_distribution(distances: list[float], max_hop_bin: int = 4) -> dict:
+    """Bin hop distances into 0, 1, 2, 3, 4+ and return counts + percentages."""
+    hop_counts = defaultdict(int)
+    for h in distances:
+        if h == float("inf"):
+            continue
+        bin_h = int(min(h, max_hop_bin))
+        hop_counts[bin_h] += 1
+
+    total_valid = sum(hop_counts.values())
+    bins = list(range(max_hop_bin + 1))
+    percentages = [hop_counts[b] / total_valid * 100 if total_valid > 0 else 0 for b in bins]
+    return {
+        "counts": {str(b): hop_counts[b] for b in bins},
+        "percentages": {str(b): round(p, 2) for b, p in zip(bins, percentages)},
+    }
+
+
+def _aggregate_seeds(all_seed_results, all_seed_distances):
+    """Average evaluate_ranker dicts across seeds into standardized format."""
     avg = {}
-    for method in METHOD_ORDER:
-        t1_vals = [sr[method]["top1"] for sr in all_seed_results if method in sr]
-        t3_vals = [sr[method]["top3"] for sr in all_seed_results if method in sr]
-        if t1_vals:
-            avg[method] = {
-                "top_1":     float(np.mean(t1_vals)),
-                "top_3":     float(np.mean(t3_vals)),
-                "top_1_std": float(np.std(t1_vals)),
-                "top_3_std": float(np.std(t3_vals)),
-                "total":     all_seed_results[0][method]["total"],
-            }
-    return avg
+    hop_dist = {}
+    all_methods = set()
+    for sr in all_seed_results:
+        all_methods.update(sr.keys())
+
+    for method in all_methods:
+        seed_dicts = [sr[method] for sr in all_seed_results if method in sr]
+        if not seed_dicts:
+            continue
+        t1_vals = [100 * m["top_k"][1] for m in seed_dicts]
+        t3_vals = [100 * m["top_k"][3] for m in seed_dicts]
+        mrr_vals = [m["mrr"] for m in seed_dicts]
+        hop_vals = [m["mean_distance"] for m in seed_dicts]
+        avg[method] = {
+            "top1_mean": float(np.mean(t1_vals)),
+            "top1_std":  float(np.std(t1_vals)),
+            "top3_mean": float(np.mean(t3_vals)),
+            "top3_std":  float(np.std(t3_vals)),
+            "mrr_mean":  float(np.mean(mrr_vals)),
+            "mrr_std":   float(np.std(mrr_vals)),
+            "mean_hops": float(np.mean(hop_vals)),
+        }
+
+        # Collect all distances across seeds for hop distribution
+        combined_distances = []
+        for sd in all_seed_distances:
+            if method in sd:
+                combined_distances.extend(sd[method])
+        hop_dist[method] = _compute_hop_distribution(combined_distances)
+
+    return avg, hop_dist
 
 
 def main() -> None:
@@ -209,22 +262,26 @@ def main() -> None:
 
     print(f"\n[3/3] Evaluating on biological cascades ({len(SEEDS)} seeds)...")
     all_seed_results = []
+    all_seed_distances = []
     for i, seed in enumerate(SEEDS):
         print(f"\n  -- SEED {i+1}/{len(SEEDS)}: {seed} --")
-        all_seed_results.append(_run_seed(cascades, models, seed))
+        metrics, distances = _run_seed(cascades, models, seed)
+        all_seed_results.append(metrics)
+        all_seed_distances.append(distances)
 
-    avg_metrics = _aggregate_seeds(all_seed_results)
+    avg_metrics, hop_distributions = _aggregate_seeds(all_seed_results, all_seed_distances)
 
-    print("\n" + "=" * 60)
+    print("\n" + "=" * 90)
     print(f"RESULTS: OutbreakTrees Biological Validation (mean ± std over {len(SEEDS)} seeds)")
-    print("=" * 60)
-    print(f"{'Method':<20} | {'Top-1 Acc':>14} | {'Top-3 Acc':>14} | {'N':>6}")
-    print("-" * 65)
+    print("=" * 90)
+    print(f"{'Method':<25} | {'Top-1 Acc (%)':>14} | {'Top-3 Acc (%)':>14} | {'MRR':>10} | {'Mean Hops':>10}")
+    print("-" * 90)
     for m in METHOD_ORDER:
         if m in avg_metrics:
             a = avg_metrics[m]
-            print(f"{m:<20} | {a['top_1']:>5.1f}±{a['top_1_std']:>4.1f}% "
-                  f"| {a['top_3']:>5.1f}±{a['top_3_std']:>4.1f}% | {a['total']:>6}")
+            print(f"{METHOD_LABELS[m]:<25} | {a['top1_mean']:>5.1f}±{a['top1_std']:>4.1f}  "
+                  f"| {a['top3_mean']:>5.1f}±{a['top3_std']:>4.1f}  "
+                  f"| {a['mrr_mean']:>8.4f}  | {a['mean_hops']:>8.3f}")
 
     json_data = {
         "n_cascades":       len(cascades),
@@ -234,6 +291,7 @@ def main() -> None:
         "method_labels":    METHOD_LABELS,
         "method_order":     METHOD_ORDER,
         "metrics":          avg_metrics,
+        "hop_distribution": hop_distributions,
     }
 
     out_path = DATA_DIR / "validate_outbreak_trees.json"
