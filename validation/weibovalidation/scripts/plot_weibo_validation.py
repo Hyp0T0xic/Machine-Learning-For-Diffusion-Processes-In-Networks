@@ -1,74 +1,121 @@
 #!/usr/bin/env python
 """
 Plot Weibo real-world validation results from saved JSON.
-Reads: data/validate_weibo.json
-Writes: figures/weibo_validation_large.png
+Uses consistent color mapping: RF variants are greener.
 
 Usage: python validation/weibovalidation/scripts/plot_weibo_validation.py
 """
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+sys.path.insert(0, str(_REPO_ROOT))
+
+from src.visualization.theme import ACCENT_COLORS
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-_REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 DATA_DIR   = _REPO_ROOT / "validation/weibovalidation/data"
 OUT_DIR    = _REPO_ROOT / "validation/weibovalidation/figures"
 
-COLORS = [
-    "#D99685", "#E38EA0", "#4DB6AC", "#9CB067", "#C0A064",
-    "#7FB382", "#A3A1D8", "#DA92B7", "#C594D1", "#56B4BE",
-]
-
+# Consistent color mapping: RF (BA) is Green, RF (ER) is Olive/Teal
+METHOD_COLORS = {
+    "RF (IC-BA)":    ACCENT_COLORS[5],  # Green
+    "RF (IC-ER)":    ACCENT_COLORS[2],  # Teal
+    "Jordan Center": ACCENT_COLORS[0],  # Salmon
+    "closeness":     ACCENT_COLORS[1],  # Pink
+    "betweenness":   ACCENT_COLORS[8],  # Purple
+    "Degree":        ACCENT_COLORS[4],  # Gold
+    "random":        ACCENT_COLORS[6],  # Periwinkle
+}
 
 def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    with open(DATA_DIR / "validate_weibo.json") as f:
+    json_path = DATA_DIR / "validate_weibo.json"
+    if not json_path.is_file():
+        print(f"Error: JSON file not found at {json_path}")
+        return
+
+    with open(json_path) as f:
         data = json.load(f)
 
-    metrics      = data["metrics"]
-    method_order = data["method_order"]
-    labels       = data["method_labels"]
-    n_cascades   = data["n_cascades"]
-    n_seeds      = data["n_seeds"]
+    metrics    = data["metrics"]
+    labels_map = data.get("method_labels", {})
+    n_cascades = data.get("n_cascades", "N/A")
 
-    present = [m for m in method_order if m in metrics]
-    x = np.arange(len(present))
+    canonical_methods = [
+        "RF (IC-BA)",
+        "RF (IC-ER)",
+        "Jordan Center",
+        "closeness",
+        "Degree",
+        "random",
+    ]
+
+    default_labels = {
+        "RF (IC-BA)": "Random Forest (IC-BA)",
+        "RF (IC-ER)": "Random Forest (IC-ER)",
+        "Jordan Center": "Jordan Centre",
+        "closeness": "Closeness",
+        "Degree": "Degree",
+        "random": "Random",
+    }
+
+    x = np.arange(len(canonical_methods))
 
     plt.style.use("default")
-    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+    fig, axes = plt.subplots(1, 2, figsize=(13, 6))
 
-    for ax, key, std_key, title in zip(
+    for ax, key, title in zip(
         axes,
         ["top_1", "top_3"],
-        ["top_1_std", "top_3_std"],
         [
             f"top-1 accuracy -- Weibo real-world validation ($n={n_cascades}$)",
             f"top-3 accuracy -- Weibo real-world validation ($n={n_cascades}$)",
         ],
     ):
-        vals = [metrics[m][key] for m in present]
-        stds = [metrics[m][std_key] for m in present]
+        vals = []
+        stds = []
+        for m in canonical_methods:
+            m_metrics = metrics.get(m, metrics.get(m.lower(), {}))
+            
+            k_target = "top1_mean" if key == "top_1" else "top3_mean"
+            k_std_target = "top1_std" if key == "top_1" else "top3_std"
+            k_old_std = f"{key}_std"
+
+            if k_target in m_metrics:
+                vals.append(m_metrics[k_target])
+                stds.append(m_metrics.get(k_std_target, 0.0))
+            else:
+                vals.append(m_metrics.get(key, 0.0))
+                stds.append(m_metrics.get(k_old_std, 0.0))
+
         for xi, (val, std) in enumerate(zip(vals, stds)):
-            ax.bar(xi, val, facecolor=COLORS[xi % len(COLORS)],
-                   edgecolor="black", linewidth=0.5)
-            lbl = f"{val:.1f}±{std:.1f}%" if std > 0.05 else f"{val:.1f}%"
-            ax.text(xi, val + 0.5, lbl, ha="center", va="bottom", fontsize=8)
+            m = canonical_methods[xi]
+            color = METHOD_COLORS.get(m, ACCENT_COLORS[9])
+            ax.bar(xi, val, facecolor=color, edgecolor="black", linewidth=0.5)
+            if val > 0:
+                lbl = f"{val:.1f}±{std:.1f}%" if std > 0.05 else f"{val:.1f}%"
+                ax.text(xi, val + 0.5, lbl, ha="center", va="bottom", fontsize=8)
+            else:
+                ax.text(xi, 1.0, "N/A", ha="center", va="bottom", fontsize=7, color="gray")
+
         ax.set_xticks(x)
-        ax.set_xticklabels(
-            [labels[m] for m in present],
-            rotation=30, ha="right", fontsize=9,
-        )
+        display_labels = [labels_map.get(m, default_labels.get(m, m)) for m in canonical_methods]
+        ax.set_xticklabels(display_labels, rotation=30, ha="right", fontsize=9)
+        
         k = 1 if key == "top_1" else 3
         ax.set_ylabel(f"top-{k} accuracy (%)")
         ax.set_title(title, fontsize=10)
         ax.set_ylim(0, 105)
+        ax.grid(True, linestyle="--", alpha=0.5, axis='y')
 
     plt.tight_layout()
     out_file = OUT_DIR / "weibo_validation_large.png"

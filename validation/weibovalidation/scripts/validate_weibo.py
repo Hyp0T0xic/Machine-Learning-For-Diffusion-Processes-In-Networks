@@ -26,7 +26,7 @@ from src.evaluation.metrics import evaluate_ranker, distance_to_source
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-WEIBO_DIR        = _REPO_ROOT / "data" / "rumdect" / "rumdect" / "Weibo"
+WEIBO_DIR        = _REPO_ROOT / "rumdect" / "Weibo"
 MODELS_DIR       = _REPO_ROOT / "results" / "models"
 DATA_DIR         = _REPO_ROOT / "validation" / "weibovalidation" / "data"
 

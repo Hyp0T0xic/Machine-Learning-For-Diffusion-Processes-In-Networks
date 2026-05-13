@@ -33,7 +33,7 @@ TREES_DIR        = _REPO_ROOT / "data" / "outbreak_trees" / "csv_exports"
 MODELS_DIR       = _REPO_ROOT / "results" / "models"
 DATA_DIR         = _REPO_ROOT / "validation" / "outbreaksvalidation" / "data"
 
-MIN_CASCADE_SIZE = 15
+MIN_CASCADE_SIZE = 10
 MAX_CASCADE_SIZE = 300
 MAX_CASCADES     = 400
 SEEDS            = [42, 123, 456, 789, 1024]

@@ -1,43 +1,45 @@
 #!/usr/bin/env python
 """
 Plot Weibo natural-range (101 cascades around median) validation results.
-
-Three panels:
-  1. Top-1 accuracy per method
-  2. Top-3 accuracy per method
-  3. Hop-distance distribution per method (grouped bars, one bar per
-     method per hop bin)
-
-JSON layout expected (matches validate_weibo.py from commit 2b0b737):
-  metrics:           per-method top1/top3/mrr (mean+std) and mean_hops
-  hop_distribution:  per-method {counts, percentages}  — top-level
+Generates:
+  1. weibo_natural_range_accuracy.png (Bar charts)
+  2. weibo_natural_range_hops.png (Grouped bar chart)
+  3. weibo_natural_range_hops_cumulative.png (Cumulative line chart)
 
 Reads:  data/validate_weibo_natural_range.json
-Writes: figures/weibo_natural_range.png
-
-Usage: python validation/weibovalidation/scripts/plot_weibo_natural_range.py
 """
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+sys.path.insert(0, str(_REPO_ROOT))
+
+from src.visualization.theme import ACCENT_COLORS
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-_REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
-DATA_DIR   = _REPO_ROOT / "validation/weibovalidation/data"
-OUT_DIR    = _REPO_ROOT / "validation/weibovalidation/figures"
-
-COLORS = [
-    "#D99685", "#E38EA0", "#4DB6AC", "#9CB067", "#C0A064",
-    "#7FB382", "#A3A1D8", "#DA92B7", "#C594D1", "#56B4BE",
-]
+DATA_DIR = _REPO_ROOT / "validation/weibovalidation/data"
+OUT_DIR  = _REPO_ROOT / "validation/weibovalidation/figures"
 
 HOP_BINS  = ["0", "1", "2", "3", "4"]
 HOP_LABEL = ["0", "1", "2", "3", "4+"]
+
+# Consistent color mapping: RF (BA) is Green, RF (ER) is Teal
+METHOD_COLORS = {
+    "RF (IC-BA)":    ACCENT_COLORS[5],  # Green
+    "RF (IC-ER)":    ACCENT_COLORS[2],  # Teal
+    "jordan":        ACCENT_COLORS[0],  # Salmon
+    "closeness":     ACCENT_COLORS[1],  # Pink
+    "degree":        ACCENT_COLORS[4],  # Gold
+    "random":        ACCENT_COLORS[6],  # Periwinkle
+    "betweenness":   ACCENT_COLORS[8],  # Purple
+}
 
 
 def _accuracy_panel(ax, present, metrics, labels, mean_key, std_key, title):
@@ -45,8 +47,10 @@ def _accuracy_panel(ax, present, metrics, labels, mean_key, std_key, title):
     stds = [metrics[m][std_key]  for m in present]
     x = np.arange(len(present))
     for xi, (val, std) in enumerate(zip(vals, stds)):
-        ax.bar(xi, val, facecolor=COLORS[xi % len(COLORS)],
-               edgecolor="black", linewidth=0.5)
+        m = present[xi]
+        color = METHOD_COLORS.get(m, ACCENT_COLORS[xi % len(ACCENT_COLORS)])
+        ax.bar(xi, val, facecolor=color,
+               edgecolor="black", linewidth=0.5, label=labels[m])
         lbl = f"{val:.1f}±{std:.1f}%" if std > 0.05 else f"{val:.1f}%"
         ax.text(xi, val + 0.5, lbl, ha="center", va="bottom", fontsize=8)
     ax.set_xticks(x)
@@ -57,6 +61,8 @@ def _accuracy_panel(ax, present, metrics, labels, mean_key, std_key, title):
     ax.set_ylabel("accuracy (%)")
     ax.set_title(title, fontsize=10)
     ax.set_ylim(0, 115)
+    ax.grid(True, linestyle="--", alpha=0.5, axis='y')
+    ax.legend(fontsize=7, loc="upper left")
 
 
 def _hop_panel(ax, present, hop_dist, labels, title):
@@ -67,8 +73,11 @@ def _hop_panel(ax, present, hop_dist, labels, title):
         pcts = hop_dist.get(m, {}).get("percentages", {})
         ys = [pcts.get(b, 0.0) for b in HOP_BINS]
         offset = (i - (n_methods - 1) / 2) * bar_w
+        
+        color = METHOD_COLORS.get(m, ACCENT_COLORS[i % len(ACCENT_COLORS)])
+            
         ax.bar(x + offset, ys, bar_w,
-               label=labels[m], facecolor=COLORS[i % len(COLORS)],
+               label=labels[m], facecolor=color,
                edgecolor="black", linewidth=0.4)
     ax.set_xticks(x)
     ax.set_xticklabels(HOP_LABEL)
@@ -76,66 +85,120 @@ def _hop_panel(ax, present, hop_dist, labels, title):
     ax.set_ylabel("% of cascades")
     ax.set_title(title, fontsize=10)
     ax.set_ylim(0, 105)
-    ax.legend(fontsize=7, ncol=2, loc="upper right", frameon=True)
+    ax.grid(True, linestyle="--", alpha=0.5, axis='y')
+    ax.legend(fontsize=8, ncol=2, loc="upper right", frameon=True)
+
+
+def _hop_cumulative_panel(ax, present, hop_dist, labels, title):
+    x = np.arange(len(HOP_BINS))
+    for i, m in enumerate(present):
+        pcts = hop_dist.get(m, {}).get("percentages", {})
+        ys = [pcts.get(b, 0.0) for b in HOP_BINS]
+        y_cum = np.cumsum(ys)
+        
+        # Ensure it starts from some context or cap at 100
+        y_cum = np.minimum(y_cum, 100.0)
+        
+        color = METHOD_COLORS.get(m, ACCENT_COLORS[i % len(ACCENT_COLORS)])
+        ax.plot(x, y_cum, marker="o", linewidth=2.5, markersize=7,
+                label=labels[m], color=color)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(HOP_LABEL)
+    ax.set_xlabel("hop distance $H$")
+    ax.set_ylabel(r"cumulative % of cascades ($\leq H$ hops)")
+    ax.set_title(title, fontsize=11)
+    ax.set_ylim(0, 105)
+    ax.grid(True, linestyle="--", alpha=0.5)
+    ax.legend(fontsize=9, loc="lower right", frameon=True)
 
 
 def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    with open(DATA_DIR / "validate_weibo_natural_range.json") as f:
+    json_path = DATA_DIR / "validate_weibo_natural_range.json"
+    if not json_path.is_file():
+        print(f"Error: JSON file not found at {json_path}")
+        return
+
+    with open(json_path) as f:
         data = json.load(f)
 
     metrics       = data["metrics"]
     hop_dist      = data.get("hop_distribution", {})
     method_order  = data["method_order"]
     labels        = data["method_labels"]
-    n_cascades    = data["n_cascades"]
-    n_seeds       = data["n_seeds"]
-    sel_min       = data.get("selected_min")
-    sel_max       = data.get("selected_max")
-    sel_median    = data.get("selected_median")
-    sel_mean      = data.get("selected_mean")
-    pop_median    = data.get("pop_size_median")
-    pop_size      = data.get("pop_size")
+    n_seeds       = data.get("n_seeds", 5)
+    n_cascades    = data.get("n_cascades", 101)
+    sel_min       = data.get("selected_min", 247)
+    sel_max       = data.get("selected_max", 264)
+    sel_median    = data.get("selected_median", 255)
+    sel_mean      = data.get("selected_mean", 255)
+    pop_median    = data.get("pop_size_median", 255)
+    pop_size      = data.get("pop_size", 4664)
 
-    present = [m for m in method_order if m in metrics]
+    # 1. Methods for Accuracy plots (exclude betweenness, closeness)
+    EXCLUDE_ACC = {"betweenness", "closeness"}
+    present_acc = [m for m in method_order if m in metrics and m.lower() not in EXCLUDE_ACC]
 
+    # 2. Methods for Hop plots (exclude betweenness, closeness, degree, random, jordan)
+    EXCLUDE_HOPS = {"betweenness", "closeness", "degree", "random", "jordan"}
+    present_hops = [m for m in method_order if m in metrics and m.lower() not in EXCLUDE_HOPS]
+
+    range_title = f"cascade size range {sel_min}–{sel_max}, median={sel_median:.0f}, $n={n_cascades}$"
+
+    # 1. Plot Accuracy Bar Charts (1x2)
     plt.style.use("default")
-    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
-
+    fig1, axes1 = plt.subplots(1, 2, figsize=(14, 6))
     _accuracy_panel(
-        axes[0], present, metrics, labels,
+        axes1[0], present_acc, metrics, labels,
         "top1_mean", "top1_std",
-        f"top-1 accuracy -- Weibo natural range "
-        f"[{sel_min}–{sel_max}] nodes ($n={n_cascades}$)",
+        f"top-1 accuracy ({range_title})",
     )
     _accuracy_panel(
-        axes[1], present, metrics, labels,
+        axes1[1], present_acc, metrics, labels,
         "top3_mean", "top3_std",
-        f"top-3 accuracy -- Weibo natural range "
-        f"[{sel_min}–{sel_max}] nodes ($n={n_cascades}$)",
+        f"top-3 accuracy ({range_title})",
     )
-    _hop_panel(
-        axes[2], present, hop_dist, labels,
-        "hop distance distribution -- Weibo natural range  (per method)",
-    )
-
+    
     mean_hops_line = "Mean hops: " + "  ".join(
-        f"{labels[m]}={metrics[m]['mean_hops']:.2f}" for m in present
+        f"{labels[m]}={metrics[m]['mean_hops']:.2f}" for m in present_acc
     )
-    fig.text(
-        0.5, 0.025,
-        f"Selected sizes: median={sel_median:.0f}, mean={sel_mean:.0f}  |  "
-        f"population median={pop_median:.0f} over {pop_size:,} cascades  |  "
-        f"averaged over {n_seeds} seeds\n{mean_hops_line}",
+    fig1.text(
+        0.5, 0.02,
+        f"Selected sizes: mean={sel_mean:.0f} | pop median={pop_median:.0f} ({pop_size:,} cascades) | {n_seeds} seeds\n{mean_hops_line}",
         ha="center", fontsize=8, color="gray",
     )
+    
+    plt.tight_layout(rect=[0, 0.08, 1, 1])
+    acc_out = OUT_DIR / "weibo_natural_range_accuracy.png"
+    fig1.savefig(acc_out, dpi=150, bbox_inches="tight")
+    plt.close(fig1)
+    print(f"Saved -> {acc_out}")
 
-    plt.tight_layout(rect=[0, 0.07, 1, 1])
-    out_file = OUT_DIR / "weibo_natural_range.png"
-    fig.savefig(out_file, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    print(f"Saved -> {out_file}")
+    # 2. Plot Hop Distance Distribution (Grouped Bars)
+    fig2, ax2 = plt.subplots(figsize=(8, 6))
+    _hop_panel(
+        ax2, present_hops, hop_dist, labels,
+        f"hop distance distribution ({range_title})",
+    )
+    plt.tight_layout()
+    hop_out = OUT_DIR / "weibo_natural_range_hops.png"
+    fig2.savefig(hop_out, dpi=150, bbox_inches="tight")
+    plt.close(fig2)
+    print(f"Saved -> {hop_out}")
+
+    # 3. Plot Hop Distance Distribution (Cumulative Curve)
+    fig3, ax3 = plt.subplots(figsize=(8, 6))
+    _hop_cumulative_panel(
+        ax3, present_hops, hop_dist, labels,
+        f"cumulative hop distance -- Weibo ({range_title})",
+    )
+    plt.tight_layout()
+    hop_cum_out = OUT_DIR / "weibo_natural_range_hops_cumulative.png"
+    fig3.savefig(hop_cum_out, dpi=150, bbox_inches="tight")
+    plt.close(fig3)
+    print(f"Saved -> {hop_cum_out}")
 
 
 if __name__ == "__main__":

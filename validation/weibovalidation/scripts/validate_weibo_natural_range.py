@@ -39,7 +39,7 @@ from src.evaluation.metrics import evaluate_ranker, distance_to_source
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-WEIBO_DIR  = _REPO_ROOT / "data" / "rumdect" / "rumdect" / "Weibo"
+WEIBO_DIR  = _REPO_ROOT / "rumdect" / "Weibo"
 MODELS_DIR = _REPO_ROOT / "results" / "models"
 DATA_DIR   = _REPO_ROOT / "validation" / "weibovalidation" / "data"
 
@@ -196,7 +196,7 @@ def select_median_centred_cascades(
 
     pop_info = {
         "pop_size":        int(len(sizes)),
-        "pop_size_median": float(median_size),
+        "pop_size_median": float(np.median(size_arr)),
         "pop_size_mean":   float(np.mean(size_arr)),
         "pop_size_min":    int(size_arr.min()),
         "pop_size_max":    int(size_arr.max()),
