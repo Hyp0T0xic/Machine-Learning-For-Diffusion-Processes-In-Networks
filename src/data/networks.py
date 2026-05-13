@@ -1,4 +1,4 @@
-"""generate er / ba / complete contact networks, compute stats, save to graphml"""
+"""generate er / ba contact networks, compute stats, save to graphml"""
 
 from __future__ import annotations
 
@@ -57,39 +57,22 @@ def generate_ba_network(n: int = 100, m: int = 3, seed: int = 42) -> nx.Graph:
     return G
 
 
-def generate_complete_graph(n: int = 100) -> nx.Graph:
-    """Generate the complete graph K_n.
-
-    Every node is connected to every other node. Used as a negative control:
-    maximal structural symmetry makes source detection near-impossible.
-
-    Parameters
-    ----------
-    n : int
-        Number of nodes.
-    """
-    G = nx.complete_graph(n)
-    G.graph.update({"name": "Complete", "model": "K_n"})
-    return G
-
-
 def generate_all_networks(
     n: int = 100,
     er_p: float = 0.05,
     ba_m: int = 3,
     seed: int = 42,
 ) -> dict[str, nx.Graph]:
-    """Generate all three contact networks with a single call.
+    """Generate both contact networks with a single call.
 
     Returns
     -------
     dict[str, nx.Graph]
-        Keys: ``"ER"``, ``"BA"``, ``"Complete"``.
+        Keys: ``"ER"``, ``"BA"``.
     """
     return {
         "ER": generate_er_network(n, er_p, seed),
         "BA": generate_ba_network(n, ba_m, seed),
-        "Complete": generate_complete_graph(n),
     }
 
 

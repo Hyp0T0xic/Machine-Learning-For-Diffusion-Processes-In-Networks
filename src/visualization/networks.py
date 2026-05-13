@@ -1,4 +1,4 @@
-"""1×3 panel of er / ba / complete networks side-by-side, coloured + sized by degree"""
+"""1×2 panel of er / ba networks side-by-side, coloured + sized by degree"""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ def visualize_networks(
     networks: dict[str, nx.Graph],
     stats: dict[str, dict] | None = None,
     save_path: str | Path | None = None,
-    figsize: tuple[int, int] = (20, 7),
+    figsize: tuple[int, int] = (14, 7),
     seed: int = 42,
 ) -> plt.Figure:
     """Visualize contact networks side-by-side with degree-centrality colouring.
@@ -22,7 +22,7 @@ def visualize_networks(
     Parameters
     ----------
     networks : dict[str, nx.Graph]
-        Keys: ``"ER"``, ``"BA"``, ``"Complete"``.
+        Keys: ``"ER"``, ``"BA"``.
     stats : dict[str, dict], optional
         Pre-computed stats from ``compute_network_stats``; added to subtitles.
     save_path : str or Path, optional
@@ -31,12 +31,14 @@ def visualize_networks(
     seed : int
         Seed for spring layout reproducibility.
     """
-    fig, axes = plt.subplots(1, 3, figsize=figsize)
+    order = [k for k in ("ER", "BA") if k in networks]
+    fig, axes = plt.subplots(1, len(order), figsize=figsize)
+    if len(order) == 1:
+        axes = [axes]
     fig.suptitle(
         "Contact Network Structures for Diffusion Cascade Source Detection",
         fontsize=16, fontweight="bold", y=1.02,
     )
-    order = ["ER", "BA", "Complete"]
     all_centralities: list[float] = []
     network_data: list[dict] = []
     for key in order:
@@ -51,10 +53,7 @@ def visualize_networks(
     for idx, data in enumerate(network_data):
         ax = axes[idx]
         G, centrality, key = data["G"], data["centrality"], data["key"]
-        pos = (
-            nx.circular_layout(G) if key == "Complete"
-            else nx.spring_layout(G, seed=seed, k=1.5 / np.sqrt(G.number_of_nodes()))
-        )
+        pos = nx.spring_layout(G, seed=seed, k=1.5 / np.sqrt(G.number_of_nodes()))
         degrees = dict(G.degree())
         max_deg = max(degrees.values(), default=1) or 1
         nx.draw_networkx_edges(G, pos, ax=ax, alpha=0.15, width=0.5)

@@ -29,7 +29,7 @@ class CascadeResult:
     cascade_edges : list[tuple[int, int]]
         Directed (infector, infected) transmission edges.
     network_name : str
-        Label of the contact network (e.g. "ER", "BA", "Complete").
+        Label of the contact network (e.g. "ER", "BA").
     """
 
     source: int

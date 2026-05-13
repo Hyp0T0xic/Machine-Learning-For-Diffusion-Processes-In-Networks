@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""run the full ic × {er, ba, complete} × r0 grid, save cascades.json + example tree figures"""
+"""run the full ic × {er, ba} × r0 grid, save cascades.json + example tree figures"""
 from __future__ import annotations
 
 import matplotlib
@@ -22,9 +22,8 @@ CASCADE_DIR = "data/raw"
 VIZ_DIR     = "results/figures/cascades"
 
 NETWORK_FILES = {
-    "ER":       f"{NETWORK_DIR}/er_network.graphml",
-    "BA":       f"{NETWORK_DIR}/ba_network.graphml",
-    "Complete": f"{NETWORK_DIR}/complete_network.graphml",
+    "ER": f"{NETWORK_DIR}/er_network.graphml",
+    "BA": f"{NETWORK_DIR}/ba_network.graphml",
 }
 
 R0_VALUES = [0.5, 1.0, 1.5, 2.0, 3.0]
