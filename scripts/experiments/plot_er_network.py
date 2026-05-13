@@ -14,8 +14,7 @@ from src.data.networks import generate_er_network
 
 
 def main() -> None:
-    # ER_P=0.03 as used in the experiment
-    G = generate_er_network(n=200, p=0.03, seed=42)
+    G = generate_er_network(n=200, p=6/199, seed=42)
 
     degrees = dict(G.degree())
     max_deg = max(degrees.values())
