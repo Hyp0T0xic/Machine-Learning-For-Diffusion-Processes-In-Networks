@@ -11,10 +11,9 @@ network:
 # Diffusion simulation parameters
 diffusion:
   r0_values: [0.5, 1.0, 1.5, 2.0, 3.0]
-  model_names: ["IC", "SI", "SIR"]
+  model_names: ["IC"]
   n_sources: 5
   n_runs: 1
-  sir_gamma: 0.2
   seed: 42
 
 # Data paths

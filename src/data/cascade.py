@@ -1,4 +1,4 @@
-"""cascade dataclass + ic/si/sir model implementations, plus the r0→param mapping"""
+"""cascade dataclass + independent-cascade model + r0→param mapping"""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ class CascadeResult:
     source : int
         True patient-zero node (ground-truth label).
     model_name : str
-        One of "IC", "SI", "SIR".
+        Always "IC" in this project.
     params : dict
         Transmission parameters used (e.g. {"p": 0.3}).
     infection_times : dict[int, int]
@@ -124,9 +124,9 @@ def r0_to_params(
     r0: float,
     avg_degree: float,
     model: str = "IC",
-    gamma: float = 0.2,
+    **_kwargs,
 ) -> dict:
-    """Map a target R₀ to model-specific transmission parameters.
+    """Map a target R₀ to IC transmission probability via p = R₀ / ⟨k⟩.
 
     Parameters
     ----------
@@ -135,31 +135,18 @@ def r0_to_params(
     avg_degree : float
         Average degree ⟨k⟩ of the contact network.
     model : str
-        One of ``"IC"``, ``"SI"``, ``"SIR"`` (case-insensitive).
-    gamma : float
-        Recovery probability — only used by SIR.
+        Kept for backwards compatibility; must be ``"IC"`` (case-insensitive).
 
     Returns
     -------
     dict
-        Parameter dict suitable for the corresponding model constructor.
-
-    Notes
-    -----
-    Mappings:
-        IC  : p    = R₀ / ⟨k⟩
-        SI  : β    = R₀ / ⟨k⟩
-        SIR : β    = R₀ · γ / ⟨k⟩
+        ``{"p": min(r0 / avg_degree, 1.0)}``.
     """
-    model = model.upper()
-    if model == "IC":
-        return {"p": min(r0 / avg_degree, 1.0)}
-    elif model == "SI":
-        return {"beta": min(r0 / avg_degree, 1.0)}
-    elif model == "SIR":
-        return {"beta": min(r0 * gamma / avg_degree, 1.0), "gamma": gamma}
-    else:
-        raise ValueError(f"Unknown model: {model!r}. Choose from IC, SI, SIR.")
+    if model.upper() != "IC":
+        raise ValueError(
+            f"Unknown model: {model!r}. Only 'IC' is supported."
+        )
+    return {"p": min(r0 / avg_degree, 1.0)}
 
 
 # model implementations
@@ -206,116 +193,11 @@ class IndependentCascade:
         )
 
 
-class SIModel:
-    """Susceptible-Infected (SI) model.
-
-    Infected nodes remain infectious forever and attempt transmission every
-    timestep with probability *β*. Terminates when no new infections occur.
-
-    Models: worst-case spread with no containment.
-    """
-
-    def __init__(self, beta: float = 0.1):
-        self.beta = beta
-
-    def run(
-        self, G: nx.Graph, source: int, seed: int | None = None, max_steps: int = 200,
-        max_size: int | None = None,
-    ) -> CascadeResult:
-        rng = random.Random(seed)
-        infection_times: dict[int, int] = {source: 0}
-        cascade_edges: list[tuple[int, int]] = []
-        infected = {source}
-        for t in range(1, max_steps + 1):
-            new_infections: dict[int, int] = {}
-            for node in infected:
-                for neighbor in G.neighbors(node):
-                    if neighbor not in infection_times and neighbor not in new_infections:
-                        if rng.random() < self.beta:
-                            new_infections[neighbor] = node
-                            if max_size is not None and len(infection_times) + len(new_infections) >= max_size:
-                                break
-                if max_size is not None and len(infection_times) + len(new_infections) >= max_size:
-                    break
-            if not new_infections:
-                break
-            for neighbor, infector in new_infections.items():
-                infection_times[neighbor] = t
-                cascade_edges.append((infector, neighbor))
-                infected.add(neighbor)
-            if max_size is not None and len(infection_times) >= max_size:
-                break
-        return CascadeResult(
-            source=source, model_name="SI", params={"beta": self.beta},
-            infection_times=infection_times, cascade_edges=cascade_edges,
-        )
-
-
-class SIRModel:
-    """Susceptible-Infected-Recovered (SIR) model.
-
-    Infected nodes transmit with probability *β* and recover (becoming
-    immune) with probability *γ* each timestep.
-
-    Best models: epidemics (COVID-19, influenza).
-    """
-
-    def __init__(self, beta: float = 0.1, gamma: float = 0.2):
-        self.beta = beta
-        self.gamma = gamma
-
-    def run(
-        self, G: nx.Graph, source: int, seed: int | None = None, max_steps: int = 200
-    ) -> CascadeResult:
-        rng = random.Random(seed)
-        infection_times: dict[int, int] = {source: 0}
-        cascade_edges: list[tuple[int, int]] = []
-        infected = {source}
-        recovered: set[int] = set()
-        for t in range(1, max_steps + 1):
-            # Transmission
-            new_infections: dict[int, int] = {}
-            for node in infected:
-                for neighbor in G.neighbors(node):
-                    if (
-                        neighbor not in infection_times
-                        and neighbor not in recovered
-                        and neighbor not in new_infections
-                        and rng.random() < self.beta
-                    ):
-                        new_infections[neighbor] = node
-            # Recovery
-            newly_recovered = {node for node in infected if rng.random() < self.gamma}
-            recovered |= newly_recovered
-            infected -= newly_recovered
-            for neighbor, infector in new_infections.items():
-                infection_times[neighbor] = t
-                cascade_edges.append((infector, neighbor))
-                infected.add(neighbor)
-            if not infected:
-                break
-        return CascadeResult(
-            source=source, model_name="SIR",
-            params={"beta": self.beta, "gamma": self.gamma},
-            infection_times=infection_times, cascade_edges=cascade_edges,
-        )
-
-
 # factory
 
 
-def create_model(name: str, **params) -> IndependentCascade | SIModel | SIRModel:
-    """Instantiate a diffusion model by name.
-
-    Parameters
-    ----------
-    name : str
-        One of ``"IC"``, ``"SI"``, ``"SIR"`` (case-insensitive).
-    **params
-        Forwarded to the model constructor.
-    """
-    name = name.upper()
-    registry = {"IC": IndependentCascade, "SI": SIModel, "SIR": SIRModel}
-    if name not in registry:
-        raise ValueError(f"Unknown model: {name!r}. Choose from {list(registry)}.")
-    return registry[name](**params)
+def create_model(name: str = "IC", **params) -> IndependentCascade:
+    """Instantiate a diffusion model by name. Only ``"IC"`` is supported."""
+    if name.upper() != "IC":
+        raise ValueError(f"Unknown model: {name!r}. Only 'IC' is supported.")
+    return IndependentCascade(**params)

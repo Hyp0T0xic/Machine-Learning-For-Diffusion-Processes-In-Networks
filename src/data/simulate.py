@@ -46,14 +46,14 @@ def run_experiment(
     seed: int = 42,
     network_name: str = "",
 ) -> list[CascadeResult]:
-    """Run a diffusion model from each source and return all results.
+    """Run the IC model from each source and return all results.
 
     Parameters
     ----------
     G : nx.Graph
         Contact network.
     model_name : str
-        ``"IC"``, ``"SI"``, or ``"SIR"``.
+        Must be ``"IC"`` (kept for API stability).
     model_params : dict
         Kwargs forwarded to the model constructor.
     sources : list[int]
