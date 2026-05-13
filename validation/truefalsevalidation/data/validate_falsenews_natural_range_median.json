@@ -1,0 +1,213 @@
+{
+  "dataset": "FalseNews",
+  "selection": "101_around_median",
+  "min_cascade_size": 25,
+  "n_cascades": 101,
+  "n_seeds": 5,
+  "pop_size": 5676,
+  "pop_size_median": 90.0,
+  "pop_size_mean": 663.7716701902748,
+  "pop_size_min": 25,
+  "pop_size_max": 46895,
+  "selected_min": 88,
+  "selected_max": 92,
+  "selected_median": 90.0,
+  "selected_mean": 89.73267326732673,
+  "method_labels": {
+    "RF (IC-BA)": "RF (trained IC-BA)",
+    "RF (IC-ER)": "RF (trained IC-ER)",
+    "jordan": "Jordan Centre",
+    "closeness": "Closeness",
+    "betweenness": "Betweenness",
+    "degree": "Degree",
+    "random": "Random"
+  },
+  "method_order": [
+    "RF (IC-BA)",
+    "RF (IC-ER)",
+    "jordan",
+    "closeness",
+    "betweenness",
+    "degree",
+    "random"
+  ],
+  "metrics": {
+    "closeness": {
+      "top1_mean": 95.04950495049505,
+      "top1_std": 0.0,
+      "top3_mean": 100.0,
+      "top3_std": 0.0,
+      "mrr_mean": 0.971947194719472,
+      "mrr_std": 1.1102230246251565e-16,
+      "mean_hops": 0.04950495049504951
+    },
+    "RF (IC-BA)": {
+      "top1_mean": 28.712871287128714,
+      "top1_std": 3.552713678800501e-15,
+      "top3_mean": 35.64356435643564,
+      "top3_std": 0.0,
+      "mrr_mean": 0.3670176529950698,
+      "mrr_std": 0.0,
+      "mean_hops": 0.9207920792079209
+    },
+    "degree": {
+      "top1_mean": 94.05940594059405,
+      "top1_std": 0.0,
+      "top3_mean": 100.0,
+      "top3_std": 0.0,
+      "mrr_mean": 0.9686468646864685,
+      "mrr_std": 0.0,
+      "mean_hops": 0.06930693069306931
+    },
+    "random": {
+      "top1_mean": 1.188118811881188,
+      "top1_std": 0.9700949476369022,
+      "top3_mean": 2.178217821782178,
+      "top3_std": 1.1546439395733268,
+      "mrr_mean": 0.05064644281628309,
+      "mrr_std": 0.008276299543205072,
+      "mean_hops": 1.3504950495049504
+    },
+    "jordan": {
+      "top1_mean": 68.31683168316832,
+      "top1_std": 2.1691982475452067,
+      "top3_mean": 90.69306930693071,
+      "top3_std": 0.4850474738184568,
+      "mrr_mean": 0.8027122892254042,
+      "mrr_std": 0.010526288873815801,
+      "mean_hops": 0.36039603960396044
+    },
+    "RF (IC-ER)": {
+      "top1_mean": 53.46534653465348,
+      "top1_std": 7.105427357601002e-15,
+      "top3_mean": 69.3069306930693,
+      "top3_std": 0.0,
+      "mrr_mean": 0.6216918560679178,
+      "mrr_std": 0.0,
+      "mean_hops": 0.5544554455445545
+    },
+    "betweenness": {
+      "top1_mean": 95.04950495049505,
+      "top1_std": 0.0,
+      "top3_mean": 100.0,
+      "top3_std": 0.0,
+      "mrr_mean": 0.971947194719472,
+      "mrr_std": 1.1102230246251565e-16,
+      "mean_hops": 0.0594059405940594
+    }
+  },
+  "hop_distribution": {
+    "closeness": {
+      "counts": {
+        "0": 480,
+        "1": 25,
+        "2": 0,
+        "3": 0,
+        "4": 0
+      },
+      "percentages": {
+        "0": 95.05,
+        "1": 4.95,
+        "2": 0.0,
+        "3": 0.0,
+        "4": 0.0
+      }
+    },
+    "RF (IC-BA)": {
+      "counts": {
+        "0": 145,
+        "1": 275,
+        "2": 70,
+        "3": 10,
+        "4": 5
+      },
+      "percentages": {
+        "0": 28.71,
+        "1": 54.46,
+        "2": 13.86,
+        "3": 1.98,
+        "4": 0.99
+      }
+    },
+    "degree": {
+      "counts": {
+        "0": 475,
+        "1": 25,
+        "2": 5,
+        "3": 0,
+        "4": 0
+      },
+      "percentages": {
+        "0": 94.06,
+        "1": 4.95,
+        "2": 0.99,
+        "3": 0.0,
+        "4": 0.0
+      }
+    },
+    "random": {
+      "counts": {
+        "0": 6,
+        "1": 363,
+        "2": 104,
+        "3": 22,
+        "4": 10
+      },
+      "percentages": {
+        "0": 1.19,
+        "1": 71.88,
+        "2": 20.59,
+        "3": 4.36,
+        "4": 1.98
+      }
+    },
+    "jordan": {
+      "counts": {
+        "0": 345,
+        "1": 138,
+        "2": 22,
+        "3": 0,
+        "4": 0
+      },
+      "percentages": {
+        "0": 68.32,
+        "1": 27.33,
+        "2": 4.36,
+        "3": 0.0,
+        "4": 0.0
+      }
+    },
+    "RF (IC-ER)": {
+      "counts": {
+        "0": 270,
+        "1": 195,
+        "2": 35,
+        "3": 5,
+        "4": 0
+      },
+      "percentages": {
+        "0": 53.47,
+        "1": 38.61,
+        "2": 6.93,
+        "3": 0.99,
+        "4": 0.0
+      }
+    },
+    "betweenness": {
+      "counts": {
+        "0": 480,
+        "1": 20,
+        "2": 5,
+        "3": 0,
+        "4": 0
+      },
+      "percentages": {
+        "0": 95.05,
+        "1": 3.96,
+        "2": 0.99,
+        "3": 0.0,
+        "4": 0.0
+      }
+    }
+  }
+}
