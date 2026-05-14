@@ -146,10 +146,27 @@ def main():
             ax.scatter(R0_RANGE[clipped_mask], np.full(clipped_mask.sum(), Y_CAP),
                        marker=marker, facecolors="none", edgecolors="black", s=50, zorder=5)
 
-    ax.axvline(x=0.5, color="black", linestyle=":", linewidth=1, label="$R_0 = 0.5$ (chosen training value)")
+    # vertical line at R0=0.5 — up to the higher (ER) intercept
+    idx_05 = int(np.argmin(np.abs(R0_RANGE - 0.5)))
+    ba_y_05 = float(ba_clipped[idx_05])
+    er_y_05 = float(er_clipped[idx_05])
+    top_y = max(ba_y_05, er_y_05)
+    ax.vlines(0.5, 0, top_y, color="black", linestyle=":", linewidth=1,
+              label="$R_0 = 0.5$ (chosen training value)")
+    ax.plot(0.5, ba_y_05, "ko", markersize=4, zorder=6)
+    ax.plot(0.5, er_y_05, "ko", markersize=4, zorder=6)
 
     ax.set_ylim(bottom=0, top=Y_CAP)
+    ax.set_xlim(0.38, 5.05)
     ax.set_xticks([0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0])
+
+    # "0.4" label dropped below standard tick height to avoid crowding "0.5"
+    ax.annotate(
+        "0.4",
+        xy=(0.4, 0), xycoords=("data", "axes fraction"),
+        xytext=(0, -28), textcoords="offset points",
+        ha="center", va="top", fontsize=10, annotation_clip=False,
+    )
     ax.set_xlabel("$R_0$", fontsize=11)
     ax.set_ylabel(f"estimated simulations for $N = {N_ESTIMATE}$ cascades", fontsize=10)
     ax.set_title(
